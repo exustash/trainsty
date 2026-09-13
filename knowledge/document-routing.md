@@ -52,13 +52,15 @@ convention. The steps for wiring a repository's Runner are a playbook.
 | System shape, dependencies, platform, protocol choices | **ADR** — [architecture/adr.md](architecture/adr.md) |
 | What is written outside memory, and what reads it back | **DDR** — [data/ddr.md](data/ddr.md) |
 
-**No SDR, and that is a gap rather than a design.** The sibling repositories keep
-security decision records; this project has a real security surface — an
-unauthenticated loopback endpoint that terminates process groups — and its floor is
-currently stated in `CLAUDE.md` → **Security** with the open question as
-`architecture/adr.md` → OD-1. **When OD-1 is settled it needs a record**, and at
-that point `security/sdr.md` is the right home for it. Filing it as an ADR instead
-would bury a security decision in a list of protocol choices.
+**And an SDR, since 2026-09-13.** `OD-1` — who may terminate a Job — was settled by
+`specs/001-serialize-e2e-runs/spec.md`'s clarification round, and this file had already
+said where the answer would go: **[security/sdr.md](security/sdr.md)**, not an ADR,
+because filing a security decision among protocol choices buries it. **SDR-001** is
+that record.
+
+| Concern | Record |
+| --- | --- |
+| A security control, or anything that weakens one | **SDR** — [security/sdr.md](security/sdr.md) |
 
 **No IDR either, and that one is not a gap:** there is no hosting to decide. A
 locally installed binary has no infrastructure.

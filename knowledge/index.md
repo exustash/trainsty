@@ -48,7 +48,8 @@ knowledge/
 ├── data/                # what state exists, and what is deliberately not written
 ├── domains/             # the vocabulary
 ├── playbooks/           # step-by-step procedures
-└── product/             # the mirrored requirements note + the register
+├── product/             # the mirrored requirements note + the register
+└── security/            # the posture, and the decisions behind it
 ```
 
 **Before filing a document**, read [Document Routing](document-routing.md) — which
@@ -111,8 +112,11 @@ The stable half of the knowledge base. All four are auto-loaded.
   `kill(pid, 0)` returns `EPERM` for another user's live process and succeeds for a
   reused PID; ADR-007 keys the Queue by PID so a reconnect is not starved; ADR-009
   makes a shutdown release the Job **without killing it**, and that asymmetry is a
-  behaviour to assert, not an implementation detail. Carries four open decisions —
-  **OD-1, who may call `/stop`, is the one with a security consequence.**
+  behaviour to assert, not an implementation detail. **ADR-012 is the newest**: the
+  product ships the Runner as `trainsty wrap`, and the record exists mostly to say why
+  process-spawning code does not violate Principle II — `wrap` is a client, and the
+  principle constrains the Daemon. Two open decisions remain (**OD-3**, **OD-4**);
+  OD-1 and OD-2 closed on 2026-09-13.
 - [Repository Structure](architecture/structure.md) — what exists today (no Go
   code, an empty remote) and the tree the first commit lands in. Names the
   four things absent on purpose, including `internal/` and a `Makefile`.
@@ -124,20 +128,29 @@ The stable half of the knowledge base. All four are auto-loaded.
   never hold the mutex across a channel send, a `Kill`, or a `Flush`.
 - [Data Decision Records](data/ddr.md) — DDR-001: nothing is persisted, and why
   persisting the Queue would be *actively harmful* rather than merely unnecessary.
-  DDR-002 holds the log destination open, and states the test that separates a
-  permissible file from a forbidden one — **anything trainsty reads at startup is a
-  stale lock waiting to happen; anything it only appends to is not.**
+  DDR-002 adds the one file trainsty writes — a per-user log, appended and **never
+  read back** — and states the test that lets the two coexist: **anything trainsty
+  reads at startup is a stale lock waiting to happen; anything it only appends to is
+  not.** It also admits what is unsolved: nothing rotates that file.
+
+### Security
+
+- [Security Decision Records](security/sdr.md) — **SDR-001**: the loopback bind,
+  POST-only, JSON content type and `Origin` check are sufficient, and no shared secret
+  gates termination. Worth reading for the **conditional** it rests on — the residual
+  risk is bounded only while `/stop` can do nothing an equally-privileged local process
+  could already do, and the record says to revisit it *before* that changes, not after.
 
 ### Playbooks
 
 Procedures, not rules — deliberately not auto-loaded.
 
-- [Integrating a Repository's Runner](playbooks/wrapper-integration.md) — the
-  procedure for wiring a repository's local CI script. **§0 is the loudest warning
-  in the knowledge base**: register a PID that is not a process group leader and a
-  Stop can signal the developer's own shell. Ends with a six-step verification in
-  dependency order, of which step 5 — *did the browsers actually die* — is the one
-  people skip and the one that catches a bad PID.
+- [Integrating a Repository's Runner](playbooks/wrapper-integration.md) — **one line
+  since ADR-012**: `trainsty wrap -- <your suite>`. The long procedure it used to
+  carry is now the *fallback* for a hand-written Runner, kept because the API is a
+  compatibility surface. Read the hand-written path's step 1 before writing one: a
+  PID that does not lead its process group makes a Stop signal the developer's own
+  shell, and `wrap` exists so nobody has to know that.
 - [Recovering a Stuck Lock](playbooks/stuck-lock-recovery.md) — diagnosis order for
   the product's one catastrophic failure, then its three real causes. Includes the
   restart of last resort and **what it costs**, which is a suite that keeps running
@@ -160,7 +173,6 @@ Procedures, not rules — deliberately not auto-loaded.
 
 | Missing | Reason |
 | ------- | ------ |
-| `security/` | Real surface, no folder yet. The floor is in `CLAUDE.md` → Security and the open question is `architecture/adr.md` → OD-1; **settling OD-1 is what creates `security/sdr.md`** — [document-routing.md](document-routing.md) says so rather than leaving it to be noticed |
 | `design/` | The Dashboard is one embedded page, specified in `conventions/dashboard.md`. A handoff folder for two lists and a button would be ceremony |
 | `audits/`, `plans/` | Both are records of current work. There is no code to audit and no sequence to plan beyond `specs/`, which the Spec Kit owns |
-| `data/schema.md` | Nothing is persisted. [data/state.md](data/state.md) is the equivalent, and DDR-001 is why |
+| `data/schema.md` | Nothing is persisted **that is read back** — DDR-002's log file is appended and never reopened, so there is no format to version. [data/state.md](data/state.md) is the equivalent, and DDR-001 is why |

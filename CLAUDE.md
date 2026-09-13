@@ -58,9 +58,14 @@ locks, and enough memory that two headless browser fleets thrash the machine. Th
 failures look like flaky tests.
 
 **The solution is a semaphore of depth one, and nothing more.** A developer's local
-CI script — the **Runner** — asks the **Daemon** for the **Lock** and blocks. The
-Daemon grants it to one Runner at a time, in arrival order. The Runner then runs its
-own tests, in its own terminal, and releases the Lock when done.
+CI script asks the **Daemon** for the **Lock** and blocks. The Daemon grants it to one
+**Runner** at a time, in arrival order. The Runner then runs the tests, in its own
+terminal, and releases the Lock when done.
+
+**The product ships the Runner**, as `trainsty wrap -- <cmd>` (ADR-012), so a
+repository's integration is one line and nobody has to get process groups right by
+hand. A hand-written Runner stays supported, because the API is a compatibility
+surface.
 
 Three consequences shape nearly every rule below:
 
@@ -318,10 +323,11 @@ Four rules over all five:
 
 ## The CLI
 
-Five subcommands, and the only interactive prompt in the product:
+Six subcommands, and one interactive prompt in the product:
 
 | Command | Does |
 | ------- | ---- |
+| `trainsty wrap -- <cmd>` | **The Runner** (ADR-012). Leads its own Process Group, registers, waits, runs `<cmd>` with its streams untouched, releases on every exit path, exits with `<cmd>`'s status |
 | `trainsty start` | Spawns the Daemon detached, binds 45678, returns the terminal |
 | `trainsty stop` | `POST /shutdown`. **Warns and confirms when a Job is active**, naming the repo — the suite keeps running and becomes invisible to the scheduler (ADR-009) |
 | `trainsty status` | Prints the active Job and the queue length |
@@ -331,8 +337,16 @@ Five subcommands, and the only interactive prompt in the product:
 - **Exit codes are the contract**, because a Runner branches on them: `0` success,
   non-zero for "no daemon reachable". A script must be able to tell *no daemon* from
   *daemon says no*.
-- **`start` says where output goes**, including "nowhere" while DDR-002 is open. A
-  developer should not discover that during an incident.
+- **`start` prints the log path** it is appending to (DDR-002). A developer should
+  not have to discover that during an incident.
+- **`wrap` is a client, not the Daemon.** It is the one place in the binary that
+  spawns a process, and Principle II constrains the Daemon — ADR-012 exists so that
+  `exec.Command` in the `wrap` path does not read as a violation. Anywhere else, it is
+  one.
+- **`wrap` passes the exit status through**, always. Swallowing a failing suite's
+  status turns a red suite green, which is worse than having no scheduler.
+- **`wrap` runs the suite even when no Daemon is reachable**, and says so once. A tool
+  that blocks work when its convenience is unavailable gets deleted from the script.
 - **A failed bind names the port and the likely cause**, and prints
   `lsof -nP -iTCP:45678` — *already running* and *something else holds it* have
   different remedies (ADR-011).
@@ -424,9 +438,15 @@ capturing, and nothing that reads the Runner's streams.
 `repo` is a developer-supplied string reaching a log line: bound its length and do
 not let it carry a newline into the log.
 
-**While DDR-002 is open, a detached Daemon's log goes nowhere**, which means a crash
-leaves no evidence. Say so in `trainsty start` rather than letting it be discovered
-during an incident.
+**The Daemon appends to a per-user log file and never reads it back** (DDR-002):
+`~/Library/Logs/trainsty.log` on Darwin,
+`${XDG_STATE_HOME:-~/.local/state}/trainsty/trainsty.log` on Linux, mode `0600`, and
+`trainsty start` prints the path. **Never read it** — a file trainsty reads at startup
+is a stale lock waiting to happen, which is why DDR-001 and DDR-002 do not conflict.
+
+**A log that cannot be opened or written must not stop the Daemon.** Losing the record
+is bad; refusing to schedule because a log file is unwritable is worse. Nothing rotates
+it, and nothing does yet by decision rather than by oversight.
 
 ---
 
@@ -447,9 +467,19 @@ The API can terminate process groups, and it is unauthenticated.
 - **Escape `repo` where it is rendered.**
 
 **Loopback is not a security boundary.** It keeps other machines out; it keeps no
-local process out, and any web page the developer has open can reach it. **Whether a
-token is also required is `knowledge/architecture/adr.md` → OD-1, and settling it
-needs a security decision record** — `knowledge/document-routing.md` says where.
+local process out.
+
+**No token is required, and that is a decision with a record** —
+`knowledge/security/sdr.md` → **SDR-001**. The four refusals above close the browser
+route completely; what stays reachable is another process running as the same
+developer, **which could already signal the suite directly**, so a token would guard a
+door with no wall beside it.
+
+**That reasoning is conditional, and the condition is the thing to protect.** It holds
+only while `/stop` does nothing an equally-privileged local process could not already
+do. Give it any reach beyond ending the current Job — a file, the network, another Job
+— and the residual is no longer bounded and SDR-001 must be revisited **before** the
+ability ships.
 
 Never commit secrets. There are none to commit today, and that is a property worth
 keeping.

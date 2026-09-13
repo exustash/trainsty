@@ -12,7 +12,12 @@ timestamp: "2026-09-13"
 > `RULES.md` §8.2 requires a DDR entry after any change to what trainsty writes
 > or reads outside its own memory — **including the decisions where writing
 > nothing was chosen**, with the reasoning. On this project that is nearly all of
-> them, which is why the file is short and the one open row matters.
+> them, which is why the file is short.
+>
+> **Two records, and they look contradictory until you read the test.** DDR-001
+> persists nothing; DDR-002 appends to a log file. Both hold because the property
+> that matters is not *does trainsty write* but **does trainsty read anything back**.
+> It does not, and FR-013b makes that a requirement.
 
 ## Template
 
@@ -38,35 +43,45 @@ exists to prevent in other people's tooling.
 
 ## Open decisions
 
-| # | Decision | Blocks |
-| - | -------- | ------ |
-| — | **Whether the Daemon writes a log file, and where** — DDR-002. It is the only candidate for on-disk state, and the case for it is real: a detached daemon's stderr goes nowhere, so today a crash leaves no evidence at all | `trainsty start`'s detach, and every diagnosis in `playbooks/stuck-lock-recovery.md`. Tracked as `architecture/adr.md` → OD-2 |
+**None.** DDR-002 closed 2026-09-13, and it was the only one.
 
 ## Decisions
 
-## DDR-002 — The log destination is undecided, and stderr-to-nowhere is the current behaviour
+## DDR-002 — The Daemon appends to a per-user log file it never reads
 
-- **Status:** proposed
+- **Status:** accepted
 - **Date:** 2026-09-13
 - **Context:** `trainsty start` detaches from the terminal, so anything the
   Daemon writes to stderr is discarded unless it is redirected. The Daemon's
   interesting events are exactly the ones nobody is watching: a Release with no
-  matching `/release`, a probe returning `EPERM`, a refused Registration.
-- **Decision:** **Not made.** Until it is, `trainsty start` must say where output
-  goes — including "nowhere" — rather than leaving a developer to discover it
-  during an incident.
-- **At rest:** nothing today.
-- **Lifetime:** n/a.
+  matching `/release`, a probe returning `EPERM`, a refused Registration. Closed by
+  `specs/001-serialize-e2e-runs/spec.md` → FR-013a and FR-013b, which needed an answer
+  for `trainsty start`.
+- **Decision:** The Daemon **appends** to a per-user file in the operating system's
+  designated log location — `~/Library/Logs/trainsty.log` on Darwin,
+  `${XDG_STATE_HOME:-~/.local/state}/trainsty/trainsty.log` on Linux — and
+  **`trainsty start` prints that path.**
+- **At rest:** plaintext, in the user's own directory, mode `0600`. It holds grants,
+  releases, refusals and their causes; it holds nothing about what any suite was
+  testing (`CLAUDE.md` → Logging).
+- **Lifetime:** indefinite, and **unbounded — see the consequence below.** Removed by
+  the user deleting it; nothing in trainsty removes it.
 - **Consequences:**
-  - **A crash currently leaves no evidence**, which makes the first real
-    stuck-lock report much harder than it needs to be.
-  - A log file does **not** violate DDR-001: it is a record of what happened,
-    never a source the Daemon reads back. That distinction is the whole test —
-    **anything trainsty reads at startup is a stale lock waiting to happen;
-    anything it only ever appends to is not.**
-  - The candidates are `~/Library/Logs/trainsty.log` on Darwin and
-    `$XDG_STATE_HOME/trainsty/trainsty.log` on Linux, which is two paths and a
-    platform branch in a project that has otherwise avoided both.
+  - **This does not violate DDR-001, and the reason is the whole test:** the file is
+    **append-only and is never read**. FR-013b makes that a requirement rather than a
+    habit. **Anything trainsty reads at startup is a stale lock waiting to happen;
+    anything it only appends to is not.**
+  - **A crash now leaves evidence**, which is what
+    `playbooks/stuck-lock-recovery.md` previously had to work without.
+  - **It costs the project's first platform branch.** Accepted: the alternative was a
+    dotfile in `$HOME` that neither platform's conventions would put there.
+  - **Nothing rotates it.** One line per lock event on a developer machine makes this a
+    slow problem rather than no problem, and the honest position is that **rotation is
+    unsolved, not handled** — revisit when a real file gets large rather than building
+    a rotator for a file nobody has yet.
+  - **A failure to open or write the log must not stop the Daemon.** Losing the record
+    is worse than nothing; refusing to schedule because a log file is unwritable is
+    worse than losing the record.
 
 ## DDR-001 — Nothing is persisted; the Lock and the Queue live in memory only
 

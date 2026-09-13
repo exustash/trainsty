@@ -110,8 +110,10 @@ turns a stale click into a kill of the wrong suite.
 Every mutating endpoint is `POST` and **refuses `GET`** with `405`. This is not
 REST tidiness: a `GET /stop` can be triggered by an `<img src>` on any page the
 developer has open, and the Daemon kills process groups. `CLAUDE.md` → Security
-carries the rest of that floor — the `Origin` check and the non-simple content
-type — and `architecture/adr.md` → OD-1 carries what is still open.
+carries the rest of that floor — the `Origin` check and the non-simple content type —
+and [`../security/sdr.md`](../security/sdr.md) → **SDR-001** is the decision that the
+floor is *sufficient*: no token, with the residual risk stated and the condition under
+which it must be revisited.
 
 ## Changing the surface
 

@@ -15,14 +15,40 @@ timestamp: "2026-09-13"
 > so a real occurrence is evidence of a defect and ends with an entry in
 > [`../ERRORS.md`](../ERRORS.md).
 >
-> **The Daemon holds no logs of the tests** (ADR-003) and writes nothing to disk
-> (DDR-001). Every diagnosis below therefore reads the *machine*, not a log file —
-> and `architecture/adr.md` → OD-2 is the open decision that would change that.
+> **The Daemon holds no logs of the tests** (ADR-003) — it never sees one. It does
+> keep a record of its *own* decisions since DDR-002, and that is where a diagnosis
+> now starts:
+>
+> ```sh
+> tail -50 ~/Library/Logs/trainsty.log                              # macOS
+> tail -50 "${XDG_STATE_HOME:-$HOME/.local/state}/trainsty/trainsty.log"   # Linux
+> ```
+>
+> **It answers a different question from the machine.** The log says *what the
+> scheduler decided and why* — every Grant, Release, refusal and probe error. The
+> machine says *what is actually true now*. A stuck Lock is precisely the case where
+> those two disagree, so read both: the log to find the Release that should have
+> happened, `ps` to confirm it did not.
 
 ## Work in this order
 
 Each step rules something out. Skipping to the restart at the end destroys the
 evidence that would have prevented the next occurrence.
+
+### 0. Read the last few decisions
+
+```sh
+tail -50 ~/Library/Logs/trainsty.log        # or the XDG path on Linux
+```
+
+Look for the Job's Grant and the absence of its Release, a probe error that is not
+`ESRCH`, or a refused Registration. **If the log shows a Release the Lock did not
+act on, skip to cause B** — that is the defect, and the rest of the steps will only
+confirm it more slowly.
+
+**If the log is empty or missing**, that is information: either the Daemon never
+started, or it could not write the file — which by design does not stop it
+(`CLAUDE.md` → Logging).
 
 ### 1. Is the Daemon even running?
 

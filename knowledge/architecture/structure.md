@@ -27,6 +27,8 @@ trainsty/
 ├── CONTRIBUTING.md            # workflow
 ├── README.md
 ├── knowledge/                 # see knowledge/index.md
+├── specs/                     # Spec Kit features. 001-serialize-e2e-runs is the
+│                              #   first, covering all three priorities
 ├── .claude/
 │   └── skills/speckit-*/      # the Spec Kit slash commands
 └── .specify/
@@ -66,6 +68,9 @@ trainsty/
 ├── dashboard/
 │   ├── embed.go               # go:embed — what makes one binary serve a UI
 │   └── index.html             #   inline CSS + JS, no build step
+├── runner/                    # `trainsty wrap` — the ONE place that spawns a
+│   │                          #   process. A client, not the Daemon (ADR-012)
+│   └── wrap.go
 └── knowledge/, .specify/, …
 ```
 

@@ -91,7 +91,7 @@ cmp "$HOME/Obsidian/Notes/Inbox/local-ci scheduler.md" \
 
 | # | Statement | Restated in |
 | - | --------- | ----------- |
-| FR-7 | Five subcommands: `start` (detached), `stop` (`POST /shutdown`), `status`, `ui` (opens the browser), `help` | `README.md`, `CLAUDE.md` → The CLI |
+| FR-7 | Five subcommands: `start` (detached), `stop` (`POST /shutdown`), `status`, `ui` (opens the browser), `help`. **The repository ships six** — see *Where the repository and the note disagree* | `README.md`, `CLAUDE.md` → The CLI, `architecture/adr.md` → ADR-012 |
 
 ## Open questions
 
@@ -101,10 +101,15 @@ table exists so the note's silences are visible from the product side too.
 
 | # | Question | Tracked as |
 | - | -------- | ---------- |
-| Q-1 | Who may call `/stop` and `/shutdown`? The note specifies no authentication, and any local process — or any web page the developer has open — can reach loopback | OD-1 |
-| Q-2 | Where does the detached daemon's output go? The note specifies detachment and no log destination | OD-2, `data/ddr.md` → DDR-002 |
 | Q-3 | Does `repo` mean anything to the daemon beyond a label? | OD-3 |
 | Q-4 | How is the binary distributed — `go install`, a tap, or a release archive? The note says "globally installed" without saying how | OD-4 |
+
+**Closed 2026-09-13** by `specs/001-serialize-e2e-runs/spec.md`'s clarification round:
+
+| # | Question | Answer |
+| - | -------- | ------ |
+| Q-1 | Who may call `/stop` and `/shutdown`? | **The floor is sufficient; no shared secret** — `security/sdr.md` → SDR-001. Spec FR-033, FR-033a |
+| Q-2 | Where does the detached daemon's output go? | **A per-user log file in the OS log location, appended and never read back** — `data/ddr.md` → DDR-002. Spec FR-013, FR-013a, FR-013b |
 
 ## Where the repository and the note disagree
 
@@ -114,6 +119,7 @@ One row, and it is a naming change rather than a requirement change.
 | ---- | --------- | --------------- | ---------- |
 | The command name | `e2e-scheduler`, in all five §5 bullets | `trainsty` | **The vault moves.** `architecture/adr.md` → ADR-010: the project was named after the note was written. Until the vault is edited, the mirror and the code disagree by design, with ADR-010 as the reason. |
 | The Runner's name | "local CI wrapper script" | **Runner** | **The vault moves.** `domains/ubiquitous-language.md` → *Words this project does not use*. A glossary term cannot be a four-word phrase that also names a shell idiom. |
+| The number of subcommands | Five: `start`, `stop`, `status`, `ui`, `help` (FR-7) | **Six** — `wrap` is added | **The vault moves.** `architecture/adr.md` → ADR-012 ships the Runner as a subcommand, which the note did not anticipate because it assumed each repository would write its own. FR-7's statement above is left as the note's, not corrected in place. |
 
 **Both are vault edits, not repository edits.** Editing the mirror to agree would
 break the byte-identical property that makes a re-copy safe.

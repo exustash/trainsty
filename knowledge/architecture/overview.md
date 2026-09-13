@@ -91,6 +91,12 @@ Naming these keeps them from arriving as accidents:
 - **No Windows support.** Not deferred — out of scope, because the product *is*
   process-group semantics (ADR-002).
 
+**One thing that stopped being absent.** The Runner used to be entirely outside the
+product; since **ADR-012** it ships as `trainsty wrap`. That is the single place in
+the binary that spawns a process, and it is a **client** — the Daemon still spawns
+nothing. A reviewer who finds `exec.Command` outside the `wrap` path should treat it
+as a defect.
+
 ## Already decided
 
 | Decision | Where it is recorded |
@@ -106,7 +112,9 @@ Naming these keeps them from arriving as accidents:
 | Shutdown releases the Job without killing it | [adr.md](adr.md) → ADR-009 |
 | The command is `trainsty` | [adr.md](adr.md) → ADR-010 |
 | Port 45678, no fallback; the bind is the instance lock | [adr.md](adr.md) → ADR-011 |
-| Nothing is persisted | [../data/ddr.md](../data/ddr.md) → DDR-001 |
+| Nothing is persisted, except an append-only log never read back | [../data/ddr.md](../data/ddr.md) → DDR-001, DDR-002 |
+| The Runner ships, as `trainsty wrap` | [adr.md](adr.md) → ADR-012 |
+| No secret gates termination; the floor suffices | [../security/sdr.md](../security/sdr.md) → SDR-001 |
 | Module boundaries | `CLAUDE.md` → Repository Architecture |
 
 ## Open decisions
@@ -114,11 +122,9 @@ Naming these keeps them from arriving as accidents:
 Each needs a record before the corresponding code is written. All four are in
 [adr.md](adr.md) → *Open decisions*:
 
-- **OD-1 — who may call `/stop`.** The one with a security consequence, and the
-  only open decision that could change a handler's shape rather than an
-  implementation detail.
-- **OD-2 — where the Daemon logs**, which is also the only candidate for on-disk
-  state (DDR-002).
 - **OD-3 — whether `repo` ever means anything.** Recorded so it cannot become a
   back door to a concurrency above 1.
 - **OD-4 — how the binary is distributed.**
+
+**OD-1 and OD-2 closed on 2026-09-13** — SDR-001 and DDR-002 respectively, both forced
+by `specs/001-serialize-e2e-runs/spec.md`'s clarification round.

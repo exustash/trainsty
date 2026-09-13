@@ -42,8 +42,6 @@ Recorded here so they are not made silently in a pull request.
 
 | # | Decision | Blocks |
 | - | -------- | ------ |
-| OD-1 | **Who may call `/stop` and `/shutdown`.** Binding `127.0.0.1` keeps other machines out; it keeps **no local process** out, and a web page the developer has open can POST a form to `http://localhost:45678/stop` from any origin. `CLAUDE.md` → Security states the floor that ships regardless — loopback bind, `Origin` check, a non-simple content type — but whether a token is required is not decided | The `/stop` and `/shutdown` handlers, and whether the Dashboard needs to hold a secret |
-| OD-2 | **Where the Daemon's log goes** once it is detached from the terminal that started it. A file under `$XDG_STATE_HOME` / `~/Library/Logs` is the obvious answer and contradicts nothing, but it is the only thing trainsty would write to disk — see [`../data/ddr.md`](../data/ddr.md) → DDR-002 | `trainsty start`, and every diagnosis in `playbooks/stuck-lock-recovery.md` |
 | OD-3 | **Whether `repo` means anything to the Daemon.** Today it is a display label for the Dashboard. If it ever gates anything — per-repository queues, a concurrency above 1 — that is a MAJOR constitution amendment, not a feature | Nothing yet. Recorded so the field is not quietly promoted |
 | OD-4 | **How the binary is distributed.** `go install`, a Homebrew tap, or a released archive. The constitution fixes *one static binary*; it does not fix how it arrives | The install instructions in `README.md`, which today say *build from source* |
 
@@ -53,7 +51,63 @@ treated as defaults: the language and distribution shape (ADR-001), the platform
 Dashboard's update mechanism (ADR-005), the queue discipline (ADR-006), and the
 port (ADR-011).
 
+**Closed 2026-09-13 by `specs/001-serialize-e2e-runs/spec.md`**, whose clarification
+round forced all three:
+
+- **`OD-1` — who may terminate a Job.** The floor is sufficient; no shared secret.
+  It is a security decision, so the record is
+  [`../security/sdr.md`](../security/sdr.md) → **SDR-001**, not an ADR — which is what
+  [`../document-routing.md`](../document-routing.md) said would happen when this
+  settled.
+- **`OD-2` — where the Daemon logs.** A per-user file in the operating system's log
+  location, append-only and never read back:
+  [`../data/ddr.md`](../data/ddr.md) → **DDR-002**, now accepted.
+- **The Runner ships**, as `trainsty wrap` — **ADR-012** below. This was not an `OD-`
+  row at all, because nothing here had recorded that it was a question.
+
 ## Decisions
+
+## ADR-012 — `trainsty wrap` ships the Runner, and it is a client rather than the Daemon
+
+- **Status:** accepted
+- **Date:** 2026-09-13
+- **Context:** ADR-003 makes the Daemon a traffic light and leaves execution to the
+  Runner — a script in each repository. That left every repository to re-implement the
+  same four steps, one of which is the product's worst hazard: a Runner that registers
+  a PID it does not lead makes a Stop either useless or lethal to the developer's
+  shell (ADR-002). `playbooks/wrapper-integration.md` existed to warn about it, and a
+  warning is a weaker control than a design in which the mistake cannot be made.
+- **Decision:** The product ships `trainsty wrap -- <command>`. It puts itself in a
+  process group it leads, registers, waits for the Grant, runs the command with its
+  streams untouched, releases on every exit path, and exits with the command's status.
+  A repository's integration becomes one line.
+- **Consequences:**
+  - **The group-leader hazard is removed by construction.** `/register`'s refusal of a
+    non-leader PID (ADR-002) becomes a backstop for hand-written Runners rather than
+    the thing standing between a developer and a killed shell.
+  - **This does not violate the constitution's Principle II**, and the reason must be
+    written down because the code will look like it does: **`trainsty wrap` is a
+    client**, a separate process the developer starts, which happens to be compiled
+    into the same binary. The **Daemon** still spawns nothing, supervises nothing, and
+    reads no output. Principle II constrains the Daemon, not the binary.
+  - **The binary now contains process-spawning code**, in the `wrap` path only. A
+    reviewer who finds `exec.Command` outside it should treat it as a defect and this
+    record as the reason.
+  - **A hand-written Runner stays supported**, because the API is a compatibility
+    surface and existing scripts cannot be upgraded by anyone here.
+  - `wrap` must **pass the exit status through**. A wrapper that swallows a failing
+    suite's status turns a red suite green, which is worse than no scheduler at all.
+  - **When the Daemon is unreachable, `wrap` runs the suite anyway** and says so once.
+    A tool that blocks work when its convenience is unavailable gets removed from the
+    script.
+- **Alternatives considered:**
+  - **Documentation only**, the pre-2026-09-13 position — rejected: it leaves the
+    hazard live in every repository and asks each one to get `setsid` and a `trap`
+    right.
+  - **A committed example script** — rejected as the worst of both: copies drift, and
+    each copy still has to be correct about process groups.
+  - **`wrap` as a separate binary** — rejected: two artifacts to install where the
+    constitution promises one, for a client that shares the Daemon's constants.
 
 ## ADR-011 — The port is 45678, hardcoded, and the bind is the single-instance lock
 
@@ -182,9 +236,10 @@ port (ADR-011).
   - An immediate Grant for the current Job makes the Runner's retry loop safe to
     write naively, which matters because it is written in shell.
 - **Alternatives considered:** a server-issued token the Runner must carry —
-  rejected for now: it makes the Runner stateful across processes, and the PID
-  is already the thing the Daemon must know. Revisit if OD-1 introduces a token
-  anyway.
+  rejected: it makes the Runner stateful across processes, and the PID is already the
+  thing the Daemon must know. **This no longer has a free ride available**: SDR-001
+  settled that no token is introduced for termination either, so a token here would be
+  the only one in the product rather than a reuse of an existing one.
 
 ## ADR-006 — Exactly one Lock holder, strict FIFO
 

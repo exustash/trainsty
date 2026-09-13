@@ -39,7 +39,7 @@ commit. Never coin a term ad hoc in code.
 | Job | The Waiter that holds the Lock and is running tests. **At most one exists.** | granted → running → released | Exactly zero or one per Daemon. Has one Process Group and one Registration. | task, run, execution, build, active test, current |
 | Grant | The moment the Lock passes to the head of the Queue, making that Waiter the Job. The Daemon's only outbound message on a Registration. | — | One per Job. | acquire, unlock, green light, go, dequeue |
 | Release | The Lock returning to nobody, and the next Grant that follows it. **Five causes, and every one of them must work** — see `CLAUDE.md` → The Release Paths. | — | One per Job, exactly once. Idempotent: a second Release for the same Job is a no-op, never a Release of its successor. | unlock, finish, complete, done, close |
-| Runner | The local CI script that owns test execution: it registers, waits for the Grant, runs the suite in the developer's terminal, and releases in a `trap`. **Not part of trainsty** — it lives in each repository being tested. | — | One per Registration. Leads one Process Group. | wrapper, wrapper script *(the requirements note's word — see below)*, client, harness, agent, hook |
+| Runner | Whatever owns test execution: it registers, waits for the Grant, runs the suite in the developer's terminal, and releases on every exit path. **`trainsty wrap` is the Runner the product ships** (ADR-012); a repository may still write its own. | — | One per Registration. Leads one Process Group. | wrapper, wrapper script *(the requirements note's word — see below)*, client, harness, agent, hook |
 | Process Group | The operating-system grouping holding the Runner and every process it started, including headless browsers. Identified by its leader's PID, which is what a Registration's `pid` must be. | — | Exactly one per Job. **The unit of termination** — a Stop signals the group, never the bare PID (ADR-002). | process tree, children, pgid *(the implementation word — it stays inside the process package)* |
 
 ### Operator actions `[cli, dashboard]`
@@ -75,6 +75,12 @@ words because they need different mechanisms.
   other way: **the vault should move to `Runner`** so the two agree. Until it
   does, cite the note's wording and use `Runner` in code. Same shape as the
   binary name below.
+
+  > **`trainsty wrap` is not a counterexample, and the distinction is exact.**
+  > `wrap` is a **verb naming what the command does** to a suite. `Runner` is the
+  > **noun naming the thing that holds the Lock.** The command is `wrap`; the entity
+  > it becomes is a Runner. So the type is `Runner`, the log line says Runner, the
+  > Dashboard says Runner — and nothing in the code is named `Wrapper`.
 - **"e2e-scheduler"** as the command name. The note's CLI section names it
   `e2e-scheduler`; the project is **trainsty**, so the command is `trainsty`
   (`architecture/adr.md` → ADR-010). The note predates the name.
