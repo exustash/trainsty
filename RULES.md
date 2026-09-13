@@ -353,20 +353,40 @@ The registers on this project, and what each one catches:
 `type/short-description`: `feat/sse-register-endpoint`,
 `fix/release-on-stream-drop`, `refactor/extract-liveness-probe`.
 
-#### 7.3 The remote, and what has not happened yet
+#### 7.3 The remote, and what `main` refuses
 
 Initialised 2026-09-13 on `main`, with `origin` at
-`git@github.com:exustash/trainsty.git`.
+`git@github.com:exustash/trainsty.git`. **The repository is public.**
 
-**Nothing has been pushed.** The remote is configured and empty, so there is no
-upstream tracking branch and no branch protection. Two consequences while that is
-true:
+`main` is protected, and the protection is **destructive-only**:
 
-- **`main` is not protected.** Nothing refuses a force-push or a red commit,
-  because there is nothing on the remote and no CI to be red. The gates in §3.3
-  are the only gate, and they are voluntary until someone wires a hook.
-- **Do not push without asking.** Publishing the first commit is the user's call
-  (§1.3 — it is outward-facing and cannot be undone quietly).
+| Setting | State |
+| ------- | ----- |
+| Force-push | **Refused, for everyone** |
+| Branch deletion | **Refused, for everyone** |
+| `enforce_admins` | **On** — the owner is not exempt |
+| Required status checks | None. **There is no CI to require** |
+| Required pull request | None. A direct push to `main` is allowed |
+
+**So `main` cannot be destroyed, and nothing checks what lands on it.** That is
+the deliberate shape while there is no CI: the destructive protections cost
+nothing, and a required review with no suite behind it gates nothing except a
+second look.
+
+Two consequences:
+
+- **The §3.3 gates are voluntary.** Nothing refuses a commit that fails
+  `gofmt -l .` or `go test -race`. Wiring a `pre-commit` hook is what makes them
+  real, and it is worth doing **before** there is Go code — a race gate that
+  arrives after the concurrent handlers do finds bugs instead of preventing them.
+- **`enforce_admins` is on, which is stricter than the sibling repositories.**
+  There is no admin bypass, deliberately: without it, protection on a
+  single-maintainer repository is a setting rather than a constraint. The cost is
+  that a genuinely wrong commit on `main` is fixed by a **new commit**, never by
+  rewriting history.
+
+**When CI exists**, add the check to this protection rather than replacing it, and
+record whether `strict` (up-to-date-before-merge) is worth a rebase per merge.
 
 ---
 
@@ -394,4 +414,5 @@ true:
 | 6.6 | A rule, value or name stated twice | Carry every restatement in the same commit. The register's file column finds what `grep` cannot |
 | 6.6 | Writing that a package, test or gate exists | **Check the tree.** This repository is documentation; a described thing is not a built thing |
 | 6.6 | The requirements note and the repository disagree | The vault moves. Record it in `product/decisions.md`, never by editing the mirror |
-| 7.3 | Pushing anything to `origin` | **Ask.** The remote is configured and empty; publishing the first commit is outward-facing and is the user's call (§1.3) |
+| 7.3 | Reaching for `git push --force` or a history rewrite on `main` | **It is refused, for everyone.** Fix a wrong commit with a new commit |
+| 7.3 | Relying on the remote to catch a failing gate | **It will not.** No CI, no required check, and a direct push to `main` is allowed. §3.3 is voluntary |

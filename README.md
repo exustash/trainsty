@@ -80,8 +80,8 @@ are specified and each one is tested — `CLAUDE.md` → The Release Paths.
 | Vocabulary | **Fixed.** Sixteen terms. Splits the note's single word *orphan* into an Orphaned Lock and an Orphaned Process |
 | Requirements | Mirrored from the Obsidian vault, verified byte-identical 2026-09-13. Two known disagreements await a **vault** edit, not a repository one |
 | Go code | **None.** No `go.mod`, no packages, no tests. `knowledge/architecture/structure.md` has the tree the first commit lands in |
-| Git | Initialised on `main`; `origin` is `git@github.com:exustash/trainsty.git`. **Nothing pushed yet**, so no upstream and no branch protection |
-| CI | None. The gate is the four commands in [Development](#development), and it is voluntary — no hook, no workflow, and nothing on the remote to run one |
+| Git | Pushed to `git@github.com:exustash/trainsty.git` (**public**). `main` is protected: force-push and deletion refused for everyone, `enforce_admins` on |
+| CI | None, so **nothing checks what lands on `main`**. The gate is the four commands in [Development](#development) and it is voluntary — no hook, no workflow (`RULES.md` §7.3) |
 | Security posture | Floor stated in `CLAUDE.md` → Security. **`OD-1` — who may call `/stop` — is open**, and settling it creates `knowledge/security/sdr.md` |
 | Distribution | **Undecided** — `OD-4`. Build from source meanwhile |
 

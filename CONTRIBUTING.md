@@ -13,10 +13,15 @@ For coding conventions and AI-specific instructions, refer to `CLAUDE.md`. For t
 operating rules that govern how work is executed and verified, refer to `RULES.md`.
 For what cannot be traded away at all, refer to `.specify/memory/constitution.md`.
 
-> **The repository exists; the remote is empty.** Initialised on `main` with
-> `origin` at `git@github.com:exustash/trainsty.git`, and nothing pushed yet — so
-> there is no branch protection and no CI. Everything below is the workflow, and
-> the gates are voluntary until a hook enforces them (`RULES.md` §7.3).
+> **`main` is protected against destruction, and against nothing else.**
+> Force-push and deletion are refused for everyone including the owner; there is no
+> required review and **no CI**, so nothing verifies a commit before it lands.
+> Everything below is the workflow, and the gates are voluntary until a hook
+> enforces them (`RULES.md` §7.3).
+>
+> One consequence for this document's whole PR section: **a direct push to `main`
+> is allowed.** The pull-request workflow below is the convention, not a rule the
+> remote enforces.
 
 ---
 
