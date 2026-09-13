@@ -1,0 +1,21 @@
+# Go build output. Anchored to the repository root: a bare `trainsty` pattern
+# would also match a directory named trainsty at any depth.
+/trainsty
+/dist/
+
+# Go test and coverage artefacts
+*.test
+*.out
+coverage.*
+
+# Agent-local settings. `.claude/skills/` IS tracked — the Spec Kit commands are
+# part of the repository — and only the machine-specific settings are not.
+.claude/settings.local.json
+
+# macOS
+.DS_Store
+
+# Editors
+*.swp
+.idea/
+.vscode/
