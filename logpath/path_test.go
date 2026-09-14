@@ -75,3 +75,47 @@ func TestResolveIsIdempotent(t *testing.T) {
 		t.Fatalf("want a stable path, got %s then %s", first, second)
 	}
 }
+
+// The failure branches. Resolve must report a usable error rather than a path the
+// caller would then fail to open — the daemon's own fallback depends on telling the
+// two apart (DDR-002).
+func TestResolveReportsAnErrorWhenTheDirectoryCannotBeCreated(t *testing.T) {
+	// A home directory that exists but cannot be written into.
+	locked := filepath.Join(t.TempDir(), "locked")
+	if err := os.MkdirAll(locked, 0o500); err != nil {
+		t.Fatalf("setup: %v", err)
+	}
+	t.Setenv("HOME", locked)
+	t.Setenv("XDG_STATE_HOME", "")
+
+	_, err := Resolve()
+
+	if os.Geteuid() == 0 {
+		t.Skip("running as root: a 0500 directory is still writable, so there is no failure to observe")
+	}
+	if err == nil {
+		t.Fatal("want an error when the log directory cannot be created")
+	}
+	if !strings.Contains(err.Error(), "log directory") {
+		t.Errorf("the error must name what it was trying to do; got %v", err)
+	}
+}
+
+func TestResolveHonoursAnXDGStateHomeThatDoesNotExistYet(t *testing.T) {
+	if runtime.GOOS == "darwin" {
+		t.Skip("darwin uses ~/Library/Logs by design")
+	}
+	home := t.TempDir()
+	state := filepath.Join(t.TempDir(), "nested", "state")
+	t.Setenv("HOME", home)
+	t.Setenv("XDG_STATE_HOME", state)
+
+	path, err := Resolve()
+
+	if err != nil {
+		t.Fatalf("a missing XDG directory must be created, not refused: %v", err)
+	}
+	if _, statErr := os.Stat(filepath.Dir(path)); statErr != nil {
+		t.Fatalf("the directory was not created: %v", statErr)
+	}
+}

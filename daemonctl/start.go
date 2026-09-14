@@ -146,7 +146,7 @@ func waitUntil(within time.Duration, cond func() bool) bool {
 
 // post sends a JSON POST, which is what the guard requires (SDR-001).
 func post(path string) (*http.Response, error) {
-	req, err := http.NewRequest(http.MethodPost, httpapi.BaseURL+path, nil)
+	req, err := http.NewRequest(http.MethodPost, baseURL+path, nil)
 	if err != nil {
 		return nil, err
 	}

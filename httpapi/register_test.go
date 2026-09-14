@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"os/exec"
+	"runtime"
 	"strings"
 	"syscall"
 	"testing"
@@ -200,4 +201,61 @@ func itoa(n int) string {
 		return "-" + string(b)
 	}
 	return string(b)
+}
+
+// The constitution's Additional Constraints name a per-client goroutine leak as a
+// defect, and on a daemon a leak is permanent — it is never restarted between runs.
+//
+// Each /register is a long-lived connection holding a goroutine, so the question is
+// not whether goroutines exist during a wait but whether they are RECLAIMED when the
+// registration goes away.
+func TestRegistrationsDoNotLeakGoroutines(t *testing.T) {
+	leader := leaderPID(t)
+	s := New(scheduler.New(), DiscardLogger())
+	srv := httptest.NewServer(s.Handler())
+	defer srv.Close()
+
+	// One cycle first, so the baseline includes whatever the server allocates once
+	// (accept loop, transport pools) rather than counting it as a leak.
+	openAndDrop(t, srv.URL, leader)
+	settle()
+	baseline := runtime.NumGoroutine()
+
+	for i := 0; i < 50; i++ {
+		openAndDrop(t, srv.URL, leader)
+	}
+	settle()
+
+	// A generous headroom: the runtime keeps idle workers around, and this test is
+	// looking for accumulation proportional to 50 cycles, not for an exact number.
+	after := runtime.NumGoroutine()
+	if after > baseline+15 {
+		t.Fatalf("goroutines grew from %d to %d across 50 registrations — a per-client leak", baseline, after)
+	}
+}
+
+// openAndDrop registers, waits for the grant, then abandons the stream — the
+// ordinary lifecycle of a Runner that finishes or is interrupted.
+func openAndDrop(t *testing.T, base string, pid int) {
+	t.Helper()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, base+"/register?pid="+itoa(pid)+"&repo=leak", nil)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("register: %v", err)
+	}
+	if _, err := bufio.NewReader(resp.Body).ReadString('\n'); err != nil {
+		t.Fatalf("no grant: %v", err)
+	}
+	resp.Body.Close()
+}
+
+// settle gives the runtime a bounded moment to reclaim finished goroutines. A poll
+// rather than a fixed sleep, so a fast machine is not made to wait.
+func settle() {
+	for i := 0; i < 40; i++ {
+		runtime.Gosched()
+		time.Sleep(25 * time.Millisecond)
+	}
 }

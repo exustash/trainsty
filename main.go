@@ -53,10 +53,27 @@ func init() {
 // separator is what the documented form uses, and it is what lets a suite take
 // flags of its own without wrap trying to parse them.
 func runWrap(args []string) int {
+	return runner.Wrap(stripSeparator(args), os.Stderr)
+}
+
+// stripSeparator drops a leading `--` so both `wrap -- cmd` and `wrap cmd` work. The
+// separator is the documented form, and it is what lets a suite take flags of its own
+// without wrap trying to parse them.
+func stripSeparator(args []string) []string {
 	if len(args) > 0 && args[0] == "--" {
-		args = args[1:]
+		return args[1:]
 	}
-	return runner.Wrap(args, os.Stderr)
+	return args
+}
+
+// hasForce reports whether the caller asked to skip the confirmation prompt.
+func hasForce(args []string) bool {
+	for _, a := range args {
+		if a == "--force" || a == "-f" {
+			return true
+		}
+	}
+	return false
 }
 
 func runStart(args []string) int  { return daemonctl.Start(os.Stdout, os.Stderr) }
@@ -65,13 +82,7 @@ func runStatus(args []string) int { return daemonctl.Status(os.Stdout, os.Stderr
 func runUI(args []string) int     { return daemonctl.UI(os.Stdout, os.Stderr) }
 
 func runStop(args []string) int {
-	force := false
-	for _, a := range args {
-		if a == "--force" || a == "-f" {
-			force = true
-		}
-	}
-	return daemonctl.Stop(force, os.Stdin, os.Stdout, os.Stderr)
+	return daemonctl.Stop(hasForce(args), os.Stdin, os.Stdout, os.Stderr)
 }
 
 func runHelp(args []string) int {

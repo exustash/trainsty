@@ -88,6 +88,17 @@ code is a control — the state it exists to refuse:
   fleet).
 - **Always reap.** A test that leaks a `sleep` leaves it for the session; a test
   that leaks the *group* leaves several. `t.Cleanup` with a group kill, every time.
+- **Observe a death by WAITING, never by probing the pid.** A killed child of the test
+  process stays a **zombie** until it is reaped, and a zombie still answers
+  `kill(pid, 0)` successfully — so a probe loop reports *survived* for a process that
+  is already dead. Either `Wait()` on it (a goroutine closing a channel, if the test
+  needs a deadline) or reap it before asserting.
+
+  **This is the rule with the highest cost-to-obviousness ratio in the repository: it
+  has broken three separate tests here** — `process/kill_test.go`,
+  `httpapi/stop_test.go` and `runner/wrap_test.go` — each time looking exactly like a
+  product bug. If a process-termination assertion fails and the code looks right, check
+  this first.
 - **Never probe or signal a PID the test did not create.** A hardcoded PID in a
   test is a signal aimed at whatever the machine happens to be running.
 - **Do not assert on timing.** A killed group is gone "soon"; poll with a deadline

@@ -264,8 +264,12 @@ func TestAcceptanceKilledHolderReleasesTheLock(t *testing.T) {
 		t.Fatalf("kill the holder's group: %v", err)
 	}
 
-	if !waitFor(10*time.Second, func() bool { return strings.Contains(waiter.output(), "PROMOTED") }) {
-		t.Fatalf("the waiter was never promoted after the holder was killed — the lock is stuck; output was %q", waiter.output())
+	// SC-003's stated bound, not a comfortable one. Measured at ~550 ms in practice —
+	// the killed Runner's socket closes, so the dropped registration fires and the
+	// 3-5 s probe is only the backstop. A looser bound here would let a regression
+	// that doubled release latency pass while still claiming to prove SC-003.
+	if !waitFor(5*time.Second, func() bool { return strings.Contains(waiter.output(), "PROMOTED") }) {
+		t.Fatalf("the waiter was not promoted within SC-003's 5s after the holder was killed — the lock is stuck; output was %q", waiter.output())
 	}
 }
 
@@ -315,12 +319,14 @@ func TestAcceptanceInterruptStopsTheSuiteAndFreesTheLock(t *testing.T) {
 		t.Fatalf("signal wrap: %v", err)
 	}
 
-	// 1. the lock is freed fast — via the dropped registration, not the 3-5s probe
-	if !waitFor(4*time.Second, func() bool { return strings.Contains(waiter.output(), "NEXT-RAN") }) {
-		t.Fatalf("the next suite did not run within 4s of the interrupt; output was %q", waiter.output())
+	// 1. SC-002's stated bound: 2 seconds. This must come from the dropped
+	//    registration rather than the 3-5 s probe, so a bound above the probe interval
+	//    would silently accept the slow path and stop proving SC-002 at all.
+	if !waitFor(2*time.Second, func() bool { return strings.Contains(waiter.output(), "NEXT-RAN") }) {
+		t.Fatalf("the next suite did not run within SC-002's 2s of the interrupt; output was %q", waiter.output())
 	}
 	// 2. and the interrupted SUITE is actually gone, not orphaned
-	if !waitFor(4*time.Second, func() bool { return syscall.Kill(suitePID, 0) != nil }) {
+	if !waitFor(2*time.Second, func() bool { return syscall.Kill(suitePID, 0) != nil }) {
 		t.Errorf("suite pid %d survived the interrupt — wrap is not forwarding the signal to its process group", suitePID)
 	}
 }
@@ -499,4 +505,75 @@ func TestAcceptanceDashboardShowsTheJobAndTheQueue(t *testing.T) {
 		t.Fatal("the same pid appears as both the job and a waiter")
 	}
 	_, _ = holder, waiter
+}
+
+// US2/AC5 and FR-025, end to end. dashboard/embed_test.go greps the page source for
+// .innerHTML, which guards the implementation; this drives the actual value through,
+// which is what proves the path.
+//
+// The label comes from a directory name, so the hostile value is supplied the way a
+// developer's repository would supply it rather than injected into a request by hand.
+func TestAcceptanceMarkupInARepoLabelIsCarriedAsData(t *testing.T) {
+	requirePortFree(t)
+	bin := buildBinary(t)
+	startDaemon(t, bin)
+
+	// No path separators: a closing tag contains "/", which MkdirAll would read as
+	// nesting and filepath.Base would then correctly reduce to the last component.
+	// The first version of this test used "</script>" and proved only that
+	// filepath.Base works. This value is the realistic vector anyway — an unclosed
+	// tag with an event handler is what turns innerHTML into execution.
+	hostile := `<img src=x onerror=alert(1)>`
+	dir := filepath.Join(t.TempDir(), hostile)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Skipf("this filesystem will not hold a directory named %q: %v", hostile, err)
+	}
+
+	cmd := exec.Command(bin, "wrap", "--", "sleep", "30")
+	cmd.Dir = dir
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	if err := cmd.Start(); err != nil {
+		t.Fatalf("start wrap: %v", err)
+	}
+	t.Cleanup(func() { _ = syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL); _ = cmd.Wait() })
+
+	if !waitFor(5*time.Second, func() bool { return fetchStatus(t).Job != nil }) {
+		t.Fatal("the suite never took the lock")
+	}
+
+	// 1. The value survives the round trip unchanged — it is data, so it is neither
+	//    rejected nor silently mangled.
+	job := fetchStatus(t).Job
+	if job.Repo != hostile {
+		t.Fatalf("want the label carried verbatim as %q, got %q", hostile, job.Repo)
+	}
+
+	// 2. And it arrives JSON-escaped rather than as raw markup in the response body,
+	//    so nothing downstream can mistake it for structure.
+	resp, err := http.Get(acceptanceBase + "/status")
+	if err != nil {
+		t.Fatalf("GET /status: %v", err)
+	}
+	raw, _ := io.ReadAll(resp.Body)
+	resp.Body.Close()
+	if !strings.Contains(string(raw), "onerror") {
+		t.Fatalf("the label is absent from /status entirely: %s", raw)
+	}
+	// encoding/json escapes < and > by default, so the value cannot be read as markup
+	// even by a client careless enough to splice the response into a document.
+	if strings.Contains(string(raw), "<img") {
+		t.Errorf("the label reached the wire as raw markup rather than escaped: %s", raw)
+	}
+
+	// 3. The dashboard itself must not contain the value: it is inserted by script
+	//    with textContent at render time, never interpolated into the served HTML.
+	page, err := http.Get(acceptanceBase + "/")
+	if err != nil {
+		t.Fatalf("GET /: %v", err)
+	}
+	body, _ := io.ReadAll(page.Body)
+	page.Body.Close()
+	if strings.Contains(string(body), "onerror") {
+		t.Fatal("the served page contains the hostile label — it is being interpolated into the HTML")
+	}
 }

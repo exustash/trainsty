@@ -13,6 +13,15 @@ import (
 
 func port() int { return httpapi.Port }
 
+// baseURL is where this package's client calls go.
+//
+// A TEST SEAM, not configuration. ADR-011 fixes the port with no flag and no
+// fallback, and nothing outside this binary can change this value — it exists so
+// the package's tests can point at an httptest server instead of binding the real
+// machine-wide port, which would make trainsty's own unit tests contend for the
+// resource trainsty exists to arbitrate.
+var baseURL = httpapi.BaseURL
+
 // Status prints what holds the Lock and who is waiting.
 //
 // Exit 3 — not 1 — when the scheduler is unreachable. A Runner must be able to
@@ -41,7 +50,7 @@ func Status(stdout, stderr io.Writer) int {
 func fetchStatus() (scheduler.Snapshot, error) {
 	var snap scheduler.Snapshot
 	client := &http.Client{Timeout: 2 * time.Second}
-	resp, err := client.Get(httpapi.BaseURL + "/status")
+	resp, err := client.Get(baseURL + "/status")
 	if err != nil {
 		return snap, err
 	}
