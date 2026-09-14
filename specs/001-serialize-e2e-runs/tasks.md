@@ -288,3 +288,38 @@ handler does not.
   which is two suites running at once
 - **After fixing any bug**, append to `knowledge/ERRORS.md` with a `Prevention:` line
   that names a test (`RULES.md` §6.1)
+
+---
+
+## Phase 7: Convergence
+
+**Appended 2026-09-14 by `/speckit-converge`.** Every finding below is a
+**verification** gap, not a behavioural one: the feature does what the spec says, and
+these are the parts that are trusted rather than proven. **No constitution principle is
+violated** — all five were checked, including the Footprint MUST, which was measured
+directly at 11.7 MB RSS and 0.0% CPU idle rather than assumed.
+
+Ordered by severity. Each task names the requirement it traces to and the gap type.
+
+- [ ] T059 Add `daemonctl/stop_test.go` and `daemonctl/status_test.go` covering the confirmation prompt, the **refusal when stdin is not a terminal** (`--force` absent), the idle/running/unreachable output shapes, and exit code 3 — per FR-013, FR-014, FR-015 (missing). `daemonctl/` is at **0.0% coverage** with real logic in it, and `CLAUDE.md` → Testing Philosophy admits no exemption; FR-014's failure mode orphans a running suite
+- [ ] T060 Add a test in `httpapi/server_test.go` that binds `127.0.0.1:45678` with a plain listener and asserts `Listen()` returns `ErrPortTaken`, then repeats against a real trainsty daemon and asserts `ErrAlreadyRunning` — per FR-019 and ADR-011 (missing). The distinction exists *because* the two remedies differ, and nothing currently proves it survives a refactor
+- [ ] T061 Tighten the acceptance bounds in `e2e_test.go` to the stated criteria: **2 s** for the interrupt case and **5 s** for the killed-holder case, replacing the current 4 s and 10 s — per SC-002 and SC-003 (partial). As written, a regression that doubled release latency passes both tests
+- [ ] T062 Add a test in `httpapi/log_test.go` asserting the log records each grant, release **with its cause**, and refusal, and asserting the absence half: no wrapped suite's output, no environment variable, no absolute path under `$HOME` — per FR-020 and `CLAUDE.md` → Logging (missing)
+- [ ] T063 Add an end-to-end assertion in `e2e_test.go` that a repository label containing markup (`<b>x`) reaches `/status` and is rendered as text — per US2/AC5 and FR-025 (partial). `dashboard/embed_test.go` greps the source for `.innerHTML`, which guards the implementation but never exercises the value
+- [ ] T064 Add a goroutine guard in `httpapi/register_test.go`: record `runtime.NumGoroutine()`, open and drop 50 registrations, then assert the count returns to its baseline within a bounded wait — per the constitution's Additional Constraints, which name a per-client goroutine leak as a defect (missing). On a daemon a leak is permanent, and nothing currently detects one
+- [ ] T065 Add `main_test.go` covering dispatch: no arguments, an unknown command, `wrap --` stripping versus `wrap` without the separator, and `--force`/`-f` parsing — per FR-017 and `contracts/cli.md` (missing). The root package is at **0.0% coverage** and the separator stripping is real logic
+- [ ] T066 Raise `runner/` coverage from **21.7%** by unit-testing `forwardSignals` re-entry behaviour and the release closure's idempotence against a stub server — per FR-034–FR-039 (partial). Signal forwarding is where two of this feature's defects already lived, and it is currently covered only at the acceptance layer
+- [ ] T067 Run quickstart scenario 4 **at full length once** — a real 30-plus-minute queue wait against a release build — and record the result in `specs/001-serialize-e2e-runs/quickstart.md` — per FR-003 and SC-004 (partial). It is currently proven only by the shortened equivalent (a 7-second wait surviving a deliberately 2-second `WriteTimeout`), which validates the mechanism but not the stated duration
+- [ ] T068 Cover `logpath/` error branches — an unresolvable home directory and an unwritable parent — raising it from **57.1%** per the plan's decision to isolate the platform branch there (partial)
+
+### Notes on what was deliberately NOT appended
+
+- **`scheduler.SetClock`, `httpapi.DiscardLogger` and `dashboard.Page`** are exported
+  test seams, each documented as such. Surfaced during the `unrequested` sweep and
+  judged legitimate rather than filed as findings.
+- **`govulncheck` reports "did not run" on every gate invocation** because it is not
+  installed. It is part of `scripts/ci-local.sh`, not of this feature's spec or plan, so
+  it is out of the convergence scope — but it is worth installing:
+  `go install golang.org/x/vuln/cmd/govulncheck@latest`.
+- **`OD-3` and `OD-4`** remain open decisions and block nothing. `OD-4` (distribution) is
+  now the practical next question, since there is a binary worth installing.
