@@ -114,6 +114,18 @@ relied on.
 survives a deliberately short server-wide timeout proves the per-request removal
 works, in seconds rather than half an hour.
 
+> **Verified at full length on 2026-09-14 (T067).** A real **30m05s** wait: the
+> waiter was confirmed still queued, and its process still alive, at five-minute
+> checkpoints throughout, then reported `granted after 30m5s` and ran to a clean exit.
+>
+> **Both forms are worth keeping, because they prove different things.** The shortened
+> one proves the *mechanism* — a wait outliving a deliberately short server-wide
+> `WriteTimeout`, which is what validates the per-request `SetWriteDeadline`. The
+> full-length one proves the *duration*, which is what FR-003 and SC-004 actually
+> state, and it is the only form that would catch a timeout living somewhere nobody
+> thought to look. Re-run the long form when anything touches the `/register` write
+> path or the server's timeouts.
+
 ## Scenario 5 — A non-leader PID is refused
 
 **Validates**: FR-010, FR-035 · US1 §9
