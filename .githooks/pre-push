@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+#
+# Pre-push gate. Runs the blocking Go jobs plus the two cheap mechanical checks
+# that guard constitutional properties (zero dependencies, the os/exec boundary).
+#
+# Deliberately NOT the full suite:
+#
+#   * The acceptance suite is omitted because it binds the machine-wide port
+#     45678 and cannot run beside a live daemon. A push gate that fails when the
+#     developer happens to have trainsty running is a push gate people bypass.
+#   * CI_LOCAL_STRICT_UNRUN is left UNSET, so a job that cannot run (no podman,
+#     no Go code yet) does not block a push. A merge gate should set it; a push
+#     gate must stay usable.
+#
+# `--quick` is therefore a WEAKER gate, not just a faster one. A green push is
+# not a green `scripts/ci-local.sh --everything` — run that before you rely on it
+# (knowledge/playbooks/local-ci.md §3).
+#
+# Wired by:  git config core.hooksPath .githooks
+# Bypassed by:  git push --no-verify   (like any hook — and the honest name for
+#               doing that is "skipping the gate", not "the gate passed")
+set -uo pipefail
+
+repo_root="$(git rev-parse --show-toplevel)" || exit 1
+gate="$repo_root/scripts/ci-local.sh"
+
+[ -x "$gate" ] || { printf 'pre-push: %s is missing or not executable\n' "$gate" >&2; exit 1; }
+
+# Unset so an exported value in the developer's shell cannot silently weaken or
+# strengthen the push gate — the hook decides its own posture.
+unset CI_LOCAL_STRICT_UNRUN
+
+exec "$gate" --quick

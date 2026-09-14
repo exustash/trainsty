@@ -81,7 +81,7 @@ are specified and each one is tested — `CLAUDE.md` → The Release Paths.
 | Requirements | Mirrored from the Obsidian vault, verified byte-identical 2026-09-13. Two known disagreements await a **vault** edit, not a repository one |
 | Go code | **None.** No `go.mod`, no packages, no tests. `knowledge/architecture/structure.md` has the tree the first commit lands in |
 | Git | Pushed to `git@github.com:exustash/trainsty.git` (**public**). `main` is protected: force-push and deletion refused for everyone, `enforce_admins` on |
-| CI | None, so **nothing checks what lands on `main`**. The gate is the four commands in [Development](#development) and it is voluntary — no hook, no workflow (`RULES.md` §7.3) |
+| CI | No workflow, so nothing on the remote checks `main`. **`scripts/ci-local.sh` is the gate**, with a `.githooks/pre-push` hook — wire it with `git config core.hooksPath .githooks` (`RULES.md` §7.3) |
 | Security posture | **Decided** — `knowledge/security/sdr.md` → SDR-001: loopback, POST-only, JSON content type, `Origin` check, and no shared secret. The residual is bounded by a stated condition, not by hope |
 | Distribution | **Undecided** — `OD-4`. Build from source meanwhile |
 
@@ -191,7 +191,20 @@ go build ./...
 
 ### Gates
 
-Every one of these must pass before a commit (`RULES.md` §3.3):
+```bash
+scripts/ci-local.sh --list        # what would run, and which jobs block
+scripts/ci-local.sh               # auto: classify the diff, run what matches
+scripts/ci-local.sh --everything  # everything, including the acceptance suite
+git config core.hooksPath .githooks   # wire the push hook, once
+```
+
+**`scripts/ci-local.sh` is the merge gate** — there is no CI workflow and no
+required check on `main`, so this script is the gate rather than a mirror of one
+([`knowledge/playbooks/local-ci.md`](knowledge/playbooks/local-ci.md)). It also
+enforces two properties a hand-run command set cannot: **`go.mod` declares no
+dependencies**, and **`os/exec` is imported only by `runner/` and `daemonctl/`**.
+
+The four commands underneath (`RULES.md` §3.3):
 
 ```bash
 gofmt -l .              # must print nothing

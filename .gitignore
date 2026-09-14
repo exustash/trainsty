@@ -8,6 +8,10 @@
 *.out
 coverage.*
 
+# Local CI scratch — scripts/ci-local.sh caches nothing today, but a downloaded
+# linter or a pinned binary would land here rather than in the tree.
+.ci-cache/
+
 # Agent-local settings. `.claude/skills/` IS tracked — the Spec Kit commands are
 # part of the repository — and only the machine-specific settings are not.
 .claude/settings.local.json

@@ -128,6 +128,12 @@ dependency changes, formatting changes, and large cleanups.
 ### Before Opening a PR
 
 ```bash
+scripts/ci-local.sh --everything
+```
+
+That runs the gate in full. The Go half by hand, if you want it piecemeal:
+
+```bash
 gofmt -l .              # must print nothing
 go vet ./...
 go build ./...
@@ -153,16 +159,27 @@ prevent. **A PR verified without `-race` has not been verified.**
 
 ### Running the suite on a machine that is already running trainsty
 
-The E2E layer binds the real port 45678, so it cannot run beside a live Daemon. It
-skips with a message rather than failing. Check first:
+The acceptance layer binds the real port 45678, so it cannot run beside a live
+Daemon — which is why `scripts/ci-local.sh` **never auto-selects it** and reports it
+unrun rather than failing when the port is busy. Check first:
 
 ```bash
 trainsty status
 lsof -nP -iTCP:45678
 ```
 
-**This is the product's own problem applied to itself**, which is worth
-appreciating rather than working around.
+**This is the product's own problem applied to itself**, which is worth appreciating
+rather than working around. `knowledge/playbooks/local-ci.md` §3 has the reasoning.
+
+### Wire the push hook once
+
+```bash
+git config core.hooksPath .githooks
+```
+
+`main` has no CI and no required check, so **the hook is the only thing that makes
+the gates real**. `git push --no-verify` bypasses it; the honest name for that is
+*skipping the gate*, not *the gate passed*.
 
 ---
 

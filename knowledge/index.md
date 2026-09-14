@@ -155,6 +155,13 @@ Procedures, not rules — deliberately not auto-loaded.
   the product's one catastrophic failure, then its three real causes. Includes the
   restart of last resort and **what it costs**, which is a suite that keeps running
   while invisible to the scheduler.
+- [Local CI](playbooks/local-ci.md) — `scripts/ci-local.sh` is the merge gate, not a
+  mirror of a workflow: there is no CI. Names the ten blocking jobs and the three
+  report-only ones, why **`--quick` is a weaker gate rather than a faster one**, and
+  why the acceptance suite can never be auto-selected — it binds the same machine-wide
+  port a real daemon holds, which is trainsty's own contention problem inside its own
+  test suite. §7 lists the four bugs the gate found in itself on its first run, three
+  of which were the same mistake.
 
 ### Product
 

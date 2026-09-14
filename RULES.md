@@ -199,7 +199,15 @@ Generic review misses this codebase's failure modes. The five to check every tim
 
 #### 3.3 Format, Vet & Test
 
-Every one of these passes before a commit:
+**`scripts/ci-local.sh` is the gate.** It runs these and more, and it is what the
+pre-push hook invokes:
+
+```bash
+scripts/ci-local.sh --quick     # what the hook runs
+scripts/ci-local.sh --everything   # everything, incl. the acceptance suite
+```
+
+The four commands underneath, runnable by hand:
 
 ```bash
 gofmt -l .              # prints nothing
@@ -211,6 +219,20 @@ go test -race ./...
 `gofmt -l .` printing a filename is a failure, not a suggestion. **`gofmt` wins
 over the global four-space style** — `knowledge/conventions/go.md` carries the
 reasoning and the scope of that exception.
+
+Three things the script adds that a hand-run set cannot:
+
+- **`go.mod` declares no dependencies** (Principle I) and **`os/exec` is imported
+  only by `runner/` and `daemonctl/`** (Principle II, ADR-012). Both are
+  constitutional properties, and both are now mechanical rather than remembered.
+- **`scheduler/` coverage ≥80%**, the constitution's floor.
+- **A job that could not run is reported as such, not as a pass.** Default runs
+  exit 0 on an unrun blocking job so the hook stays usable; set
+  `CI_LOCAL_STRICT_UNRUN=1` when green must mean everything ran.
+
+**`--quick` is a weaker gate, not only a faster one** — it omits the acceptance
+suite, the only layer that drives the built binary. `knowledge/playbooks/local-ci.md`
+has the detail, including why the acceptance suite can never be auto-selected.
 
 #### 3.4 Strictness
 
@@ -404,7 +426,7 @@ record whether `strict` (up-to-date-before-merge) is worth a rebase per merge.
 | 3.1 | Before any review | Green first — §3.3 in full |
 | 3.1 | Writing the fix for a finding | One commit per finding, test committed first and watched failing, repair narrowly |
 | 3.2 | Reviewing anything here | The five checks: mutex across a block, a new release path, an unvalidated PID, an errno as a boolean, an API change |
-| 3.3 | Before any commit | `gofmt -l .` silent, `go vet`, `go build`, `go test -race` |
+| 3.3 | Before any commit or push | **`scripts/ci-local.sh`** — `--quick` is what the hook runs, `--everything` is what a merge needs. It adds the two constitutional checks a hand-run set cannot: no dependencies in `go.mod`, `os/exec` only in `runner/` and `daemonctl/` |
 | 4.1 | A dependency looks necessary | Justify in Complexity Tracking **before** use; a test-only one counts |
 | 5.2 | An error in a cleanup path | Log it and **release anyway** |
 | 6.1 | After fixing a bug | Append to `knowledge/ERRORS.md`; `Prevention:` names a test |
@@ -415,4 +437,4 @@ record whether `strict` (up-to-date-before-merge) is worth a rebase per merge.
 | 6.6 | Writing that a package, test or gate exists | **Check the tree.** This repository is documentation; a described thing is not a built thing |
 | 6.6 | The requirements note and the repository disagree | The vault moves. Record it in `product/decisions.md`, never by editing the mirror |
 | 7.3 | Reaching for `git push --force` or a history rewrite on `main` | **It is refused, for everyone.** Fix a wrong commit with a new commit |
-| 7.3 | Relying on the remote to catch a failing gate | **It will not.** No CI, no required check, and a direct push to `main` is allowed. §3.3 is voluntary |
+| 7.3 | Relying on the remote to catch a failing gate | **It will not.** No CI, no required check, and a direct push to `main` is allowed. **`.githooks/pre-push` is the only enforcement** — wire it with `git config core.hooksPath .githooks`, and `--no-verify` skips it |

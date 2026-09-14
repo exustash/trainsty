@@ -172,7 +172,7 @@ deliberately deferred from the planning commit until the code existed.
 - [ ] T055 Verify `go test -race -cover ./scheduler/` reports **≥80% statements** and that all five release paths have a test, per `knowledge/conventions/testing.md` → *Every release path has a test*. If a path lacks one, that test is the fix
 - [ ] T056 Run `scripts`-free gate sweep by hand and record it: `gofmt -l .` silent, `go vet ./...`, `go build ./...`, `go test -race ./...`. Confirm `go.mod` still has **no `require` block**
 - [ ] T057 Walk every scenario in `specs/001-serialize-e2e-runs/quickstart.md` end to end on a clean machine state, including scenario 10's *the daemon must not read its own log* check — the load-bearing half of DDR-002
-- [ ] T058 [P] Add a `pre-commit` hook under `.githooks/` running the four gates, and document wiring it with `git config core.hooksPath .githooks` in `CONTRIBUTING.md`. `main` has no CI and no required check (`RULES.md` §7.3), so this is the only thing that makes the gates real
+- [x] T058 [P] ~~Add a hook under `.githooks/` running the gates~~ **DONE 2026-09-14, ahead of the phase.** `scripts/ci-local.sh` + `.githooks/pre-push` (running `--quick`) + `knowledge/playbooks/local-ci.md`. Landed early because the gates it enforces — `go.mod` declaring nothing, `os/exec` confined to `runner/` and `daemonctl/` — are cheaper to have before the code than to retrofit after. Wire it with `git config core.hooksPath .githooks`
 
 ---
 
