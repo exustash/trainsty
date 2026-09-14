@@ -109,12 +109,11 @@ func TestRepoLabelNamesSomething(t *testing.T) {
 func TestAcquireFallsBackWhenNoDaemonIsReachable(t *testing.T) {
 	var sb strings.Builder
 
-	release, waited := acquire(os.Getpid(), "test", &sb)
+	release := acquire(os.Getpid(), "test", &sb)
 	defer release()
 
-	if waited {
-		t.Fatal("want waited=false when no scheduler answered")
-	}
+	// The notice IS the assertion that nothing was waited for: acquire returns
+	// without blocking, and says so once.
 	if !strings.Contains(sb.String(), "NOT serialized") {
 		t.Fatalf("want a notice that the run is unscheduled, got %q", sb.String())
 	}
@@ -200,7 +199,7 @@ func forwardChild() {
 // dropped stream are two independent paths to the same place.
 func TestReleaseClosureIsIdempotentWhenThereIsNoDaemon(t *testing.T) {
 	var sb strings.Builder
-	release, _ := acquire(os.Getpid(), "test", &sb)
+	release := acquire(os.Getpid(), "test", &sb)
 
 	release()
 	release() // must not panic, and must not block

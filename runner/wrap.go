@@ -58,7 +58,7 @@ func Wrap(args []string, stderr io.Writer) int {
 	repo := repoLabel()
 	pid := os.Getpid()
 
-	release, waited := acquire(pid, repo, stderr)
+	release := acquire(pid, repo, stderr)
 	defer release()
 
 	// Running an arbitrary command IS this function's purpose — wrap is `env`, `time`
@@ -85,7 +85,6 @@ func Wrap(args []string, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "trainsty: could not start %s: %v\n", args[0], err)
 		return 1
 	}
-	_ = waited
 
 	stop := forwardSignals()
 	defer stop()
@@ -120,7 +119,7 @@ func becomeGroupLeader() error {
 // so ONCE. A missing scheduler costs a convenience, not the developer's work
 // (FR-038) — and a silently unscheduled run is indistinguishable from a scheduled
 // one until two collide, which is why it is said at all.
-func acquire(pid int, repo string, stderr io.Writer) (release func(), waited bool) {
+func acquire(pid int, repo string, stderr io.Writer) (release func()) {
 	target := fmt.Sprintf("%s/register?pid=%d&repo=%s", httpapi.BaseURL, pid, url.QueryEscape(repo))
 
 	// No client timeout, ever: a queue wait is unbounded, and a timeout here
@@ -129,7 +128,7 @@ func acquire(pid int, repo string, stderr io.Writer) (release func(), waited boo
 	resp, err := client.Get(target)
 	if err != nil {
 		fmt.Fprintln(stderr, "trainsty: no scheduler reachable — this run is NOT serialized")
-		return func() {}, false
+		return func() {}
 	}
 	if resp.StatusCode != http.StatusOK {
 		body := make([]byte, 256)
@@ -137,7 +136,7 @@ func acquire(pid int, repo string, stderr io.Writer) (release func(), waited boo
 		resp.Body.Close()
 		fmt.Fprintf(stderr, "trainsty: the scheduler refused this run (%s %s) — running anyway, NOT serialized\n",
 			resp.Status, strings.TrimSpace(string(body[:n])))
-		return func() {}, false
+		return func() {}
 	}
 
 	// The stream stays open for the whole run: it is the Daemon's primary signal
@@ -166,7 +165,7 @@ func acquire(pid int, repo string, stderr io.Writer) (release func(), waited boo
 			timer.Stop()
 			resp.Body.Close()
 			fmt.Fprintln(stderr, "trainsty: lost the scheduler while waiting — running anyway, NOT serialized")
-			return func() {}, false
+			return func() {}
 		}
 		if strings.HasPrefix(line, "event: grant") {
 			break
@@ -192,7 +191,7 @@ func acquire(pid int, repo string, stderr io.Writer) (release func(), waited boo
 		// above is therefore not worth reporting: the Lock is freed either way, and
 		// an error printed on the normal path is an error developers learn to ignore.
 		resp.Body.Close()
-	}, true
+	}
 }
 
 // forwardSignals relays SIGINT and SIGTERM to the whole process group.
