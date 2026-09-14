@@ -30,6 +30,7 @@ const (
 //
 // It writes a code and nothing else: never an internal error string, a filesystem
 // path, or an errno text. The detail belongs in the log.
+//
 // The encode error is discarded deliberately, here and in writeJSON. Every value
 // either function writes is primitives or a Snapshot of them, so marshalling cannot
 // fail: the only way to get an error is a client that has already gone. The status
