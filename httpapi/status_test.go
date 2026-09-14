@@ -55,3 +55,25 @@ func TestStatusReportsTheJobAndTheQueueInGrantOrder(t *testing.T) {
 		t.Fatal("a pid appears as both the Job and a Waiter")
 	}
 }
+
+func TestRootServesTheDashboardAndOtherPathsAre404(t *testing.T) {
+	s := New(scheduler.New(), DiscardLogger())
+
+	rec := httptest.NewRecorder()
+	s.Handler().ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/", nil))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("want 200 at /, got %d", rec.Code)
+	}
+	if !strings.Contains(rec.Body.String(), "trainsty") {
+		t.Fatal("want the dashboard at /")
+	}
+
+	rec = httptest.NewRecorder()
+	s.Handler().ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/admin", nil))
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("want 404 at /admin, got %d", rec.Code)
+	}
+	if rec.Body.Len() != 0 {
+		t.Fatalf("want an empty 404 body, got %q", rec.Body.String())
+	}
+}

@@ -143,11 +143,27 @@ func acquire(pid int, repo string, stderr io.Writer) (release func(), waited boo
 	// The stream stays open for the whole run: it is the Daemon's primary signal
 	// that this Runner is alive (ADR-008). Closing it is release path 2.
 	started := time.Now()
-	announced := false
+
+	// Announced from a TIMER, not from inside the read loop.
+	//
+	// The daemon sends nothing at all until the Grant, so ReadString blocks for the
+	// entire wait — a check inside the loop is only reached once the Grant has
+	// already arrived, which is exactly when the message is useless. Found by running
+	// two suites by hand and noticing the promised line never appeared.
+	//
+	// The delay keeps a fast run quiet: wrapping a suite that is granted immediately
+	// must not add noise.
+	announced := make(chan struct{})
+	timer := time.AfterFunc(300*time.Millisecond, func() {
+		fmt.Fprintln(stderr, "trainsty: waiting for the lock…")
+		close(announced)
+	})
+
 	reader := bufio.NewReader(resp.Body)
 	for {
 		line, readErr := reader.ReadString('\n')
 		if readErr != nil {
+			timer.Stop()
 			resp.Body.Close()
 			fmt.Fprintln(stderr, "trainsty: lost the scheduler while waiting — running anyway, NOT serialized")
 			return func() {}, false
@@ -155,14 +171,10 @@ func acquire(pid int, repo string, stderr io.Writer) (release func(), waited boo
 		if strings.HasPrefix(line, "event: grant") {
 			break
 		}
-		if !announced && time.Since(started) > 300*time.Millisecond {
-			// Only said when the run actually waits: wrapping a fast suite must not
-			// add noise.
-			fmt.Fprintln(stderr, "trainsty: waiting for the lock…")
-			announced = true
-		}
 	}
-	if announced {
+	if !timer.Stop() {
+		// The notice was printed, so the wait was real and worth closing off.
+		<-announced
 		fmt.Fprintf(stderr, "trainsty: granted after %s\n", time.Since(started).Round(time.Second))
 	}
 

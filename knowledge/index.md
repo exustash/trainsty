@@ -42,7 +42,7 @@ label.
 knowledge/
 ├── index.md             # this file
 ├── document-routing.md  # which folder owns a new document
-├── ERRORS.md            # error log & pattern prevention — empty, by honesty
+├── ERRORS.md            # error log & pattern prevention — six entries from feature 001
 ├── architecture/        # system shape and the decisions behind it
 ├── conventions/         # how we write code, per layer
 ├── data/                # what state exists, and what is deliberately not written

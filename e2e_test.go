@@ -26,6 +26,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"os/exec"
@@ -384,4 +385,118 @@ func TestAcceptanceStatusExitsThreeWhenNoDaemonIsReachable(t *testing.T) {
 	if exitErr.ExitCode() != 3 {
 		t.Fatalf("want exit code 3 for an unreachable scheduler, got %d", exitErr.ExitCode())
 	}
+}
+
+// ---------------------------------------------------------------------------
+// Scenario 7 — Stop kills the whole tree.
+// quickstart.md scenario 7 · FR-027-FR-032 · US3 §1-6 · SC-005
+// ---------------------------------------------------------------------------
+
+func TestAcceptanceStopKillsTheWholeSuiteTree(t *testing.T) {
+	requirePortFree(t)
+	bin := buildBinary(t)
+	startDaemon(t, bin)
+
+	// A suite that spawns children of its own, recording every pid so the assertion
+	// is about the whole tree rather than only the process wrap started.
+	pidFile := filepath.Join(t.TempDir(), "tree.pids")
+	holder := startWrapped(t, bin, "sh", "-c",
+		fmt.Sprintf("sleep 300 & echo $! >> %s; sleep 300 & echo $! >> %s; echo $$ >> %s; wait",
+			pidFile, pidFile, pidFile))
+	if !waitFor(5*time.Second, func() bool { return fetchStatus(t).Job != nil }) {
+		t.Fatal("the suite never took the lock")
+	}
+
+	var tree []int
+	if !waitFor(5*time.Second, func() bool {
+		raw, err := os.ReadFile(pidFile)
+		if err != nil {
+			return false
+		}
+		tree = nil
+		for _, line := range strings.Fields(string(raw)) {
+			if pid, convErr := strconv.Atoi(line); convErr == nil {
+				tree = append(tree, pid)
+			}
+		}
+		return len(tree) == 3
+	}) {
+		t.Fatalf("the suite never recorded its three pids, got %v", tree)
+	}
+	for _, pid := range tree {
+		if syscall.Kill(pid, 0) != nil {
+			t.Fatalf("precondition: pid %d should be alive", pid)
+		}
+	}
+
+	waiter := startWrapped(t, bin, "sh", "-c", "echo AFTER-STOP")
+
+	req, err := http.NewRequest(http.MethodPost, acceptanceBase+"/stop", nil)
+	if err != nil {
+		t.Fatalf("build request: %v", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("POST /stop: %v", err)
+	}
+	resp.Body.Close()
+
+	// Nothing the suite started may survive: those processes hold the ports and the
+	// memory the next run needs, which is the whole reason this product is Unix-only.
+	for _, pid := range tree {
+		if !waitFor(5*time.Second, func() bool { return syscall.Kill(pid, 0) != nil }) {
+			t.Errorf("pid %d survived the stop — the signal did not reach the whole group", pid)
+		}
+	}
+	if !waitFor(10*time.Second, func() bool { return strings.Contains(waiter.output(), "AFTER-STOP") }) {
+		t.Fatalf("the queue did not advance after the stop; output was %q", waiter.output())
+	}
+	_ = holder
+}
+
+// ---------------------------------------------------------------------------
+// Scenario 6 — the dashboard reflects reality.
+// quickstart.md scenario 6 · FR-021, FR-022, FR-026 · US2 §1-6 · SC-006
+// ---------------------------------------------------------------------------
+
+func TestAcceptanceDashboardShowsTheJobAndTheQueue(t *testing.T) {
+	requirePortFree(t)
+	bin := buildBinary(t)
+	startDaemon(t, bin)
+
+	resp, err := http.Get(acceptanceBase + "/")
+	if err != nil {
+		t.Fatalf("GET /: %v", err)
+	}
+	body, _ := io.ReadAll(resp.Body)
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("want 200 at /, got %s", resp.Status)
+	}
+	if !strings.Contains(string(body), "<title>trainsty</title>") {
+		t.Fatal("want the dashboard page at /")
+	}
+
+	holder := startWrapped(t, bin, "sleep", "300")
+	waiter := startWrapped(t, bin, "sleep", "300")
+	if !waitFor(5*time.Second, func() bool {
+		st := fetchStatus(t)
+		return st.Job != nil && len(st.Queue) == 1
+	}) {
+		t.Fatal("want one job and one waiter")
+	}
+
+	// The elapsed time must ADVANCE: the page shows a counter rather than a static
+	// badge precisely because it can be seconds behind reality (ADR-005).
+	first := fetchStatus(t).Job.ElapsedSeconds
+	if !waitFor(4*time.Second, func() bool { return fetchStatus(t).Job.ElapsedSeconds > first }) {
+		t.Fatalf("elapsedSeconds never advanced from %d", first)
+	}
+
+	st := fetchStatus(t)
+	if st.Queue[0].PID == st.Job.PID {
+		t.Fatal("the same pid appears as both the job and a waiter")
+	}
+	_, _ = holder, waiter
 }

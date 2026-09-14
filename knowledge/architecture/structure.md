@@ -46,33 +46,53 @@ Two things to know about that tree:
   update — [`../product/decisions.md`](../product/decisions.md) → *Re-copying the
   mirror* has the command and the verification.
 
-## The tree the first code lands in
-
-Planned, not present. It follows the dependency direction in
-[overview.md](overview.md).
+## The Go tree
 
 ```text
 trainsty/
-├── go.mod                     # expected to require nothing — ADR-001
-├── main.go                    # flag parsing + subcommand dispatch ONLY
-├── scheduler/
-│   ├── scheduler.go           # the Lock, the Queue, Grant, Release
-│   └── scheduler_test.go      #   pure: no server, no children, -race
-├── process/
-│   ├── group.go               # GroupAlive, KillGroup — the only syscall site
-│   └── group_test.go          #   real short-lived children, always reaped
-├── httpapi/
-│   ├── api.go                 # ServeMux, the five routes, the JSON wire types
-│   ├── register.go            # the SSE handler — zero WriteTimeout, Flush
-│   └── *_test.go              #   httptest, including the Grant event
-├── dashboard/
-│   ├── embed.go               # go:embed — what makes one binary serve a UI
-│   └── index.html             #   inline CSS + JS, no build step
-├── runner/                    # `trainsty wrap` — the ONE place that spawns a
-│   │                          #   process. A client, not the Daemon (ADR-012)
-│   └── wrap.go
-└── knowledge/, .specify/, …
+├── go.mod                      # requires NOTHING — ADR-001, enforced by ci-local.sh
+├── main.go                     # subcommand dispatch only; the table is help's source
+├── doc.go                      # what trainsty is, for `go doc`
+├── scheduler/                  # the Lock and the Queue. No net/http, no syscall
+│   ├── scheduler.go            #   Register, Grant, Release, Withdraw, Snapshot
+│   └── scheduler_test.go       #   99% statements; the constitution's floor is 80%
+├── process/                    # the ONLY syscall site
+│   ├── group.go                #   Alive (ESRCH vs EPERM), IsGroupLeader
+│   ├── kill.go                 #   KillGroup — the one real signal, refuses pid <= 1
+│   └── *_test.go               #   real children, always reaped
+├── httpapi/                    # the five endpoints
+│   ├── server.go               #   mux, loopback bind, timeouts, bind classification
+│   ├── guard.go                #   the SDR-001 floor; the only error-body writer
+│   ├── register.go             #   SSE: per-request deadline, two flushes
+│   ├── status.go               #   snapshot under the mutex, marshal after
+│   ├── control.go              #   /release /stop /shutdown
+│   ├── probe.go                #   the liveness backstop, owned by the Job
+│   ├── log.go                  #   append-only, never read back (DDR-002)
+│   └── *_test.go
+├── runner/                     # `trainsty wrap` — client-side (ADR-012)
+│   ├── wrap.go                 #   becomes a group leader, registers ITSELF
+│   └── wrap_test.go
+├── daemonctl/                  # start / serve / stop / status / ui — client-side
+│   ├── start.go                #   re-exec with Setsid, then VERIFY the bind
+│   ├── stop.go                 #   the confirmation prompt (ADR-009)
+│   ├── status.go               #   exit 3 when unreachable
+│   └── ui.go
+├── logpath/                    # the project's only platform branch
+├── dashboard/                  # go:embed — one file, no build step
+│   ├── embed.go
+│   ├── index.html
+│   └── embed_test.go           #   greps the page for .innerHTML and remote URLs
+├── e2e_test.go                 # ACCEPTANCE — build tag `e2e`, see below
+├── scripts/ci-local.sh         # the merge gate
+└── .githooks/pre-push          # runs ci-local.sh --quick
 ```
+
+**`e2e_test.go` carries `//go:build e2e`, and the tag is load-bearing.** Without it
+the acceptance suite matches `go test ./...` and runs concurrently with the
+dedicated acceptance job under `scripts/ci-local.sh` — two runs fighting over port
+45678. Run it with `go test -tags e2e -race -p 1 -run TestAcceptance .`, and note
+that the gate refuses to report a pass when it finds no cases, because the first
+version of that fix turned the failure into a false green.
 
 ## Names that are not free to change
 

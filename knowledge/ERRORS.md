@@ -2,16 +2,16 @@
 okf_version: "0.1"
 type: error-log
 title: "Error Log & Pattern Prevention Guide"
-description: "A living log of errors and bugs after they are resolved, in RULES.md §8.1's four-part shape. Empty today because no code exists yet. The value of an entry is its Prevention line and the test that line names."
+description: "A living log of errors and bugs after they are resolved, in RULES.md §8.1's four-part shape. Carries the six defects found while implementing feature 001 — three in the product, three in the tooling and tests that were supposed to catch it."
 tags: [knowledge, logs, errors, patterns]
-timestamp: "2026-09-13"
+timestamp: "2026-09-14"
 ---
 
 # Error Log & Pattern Prevention Guide
 
-> `RULES.md` §8.1 requires an entry after resolving **any** error or bug. The
-> value of this file is the `Prevention:` line: an entry that only records what
-> broke is a changelog, not a guard.
+> `RULES.md` §8.1 requires an entry after resolving **any** error or bug. The value
+> of this file is the `Prevention:` line: an entry that only records what broke is a
+> changelog, not a guard.
 
 ## The shape
 
@@ -31,26 +31,90 @@ Maximum three lines per section. Keep it scannable.
 | Thing | Where it goes |
 | ----- | ------------- |
 | A bug that has been **resolved** | Here, in the shape above |
-| A bug that is **known and unfixed** | A task line in `specs/**/tasks.md`. It cannot supply `Fix:` or `Prevention:`, so it cannot be an entry here |
-| A failure mode the design **anticipates** but has never seen | Not here. It belongs to whichever record decided the mitigation — `architecture/adr.md`, or `playbooks/stuck-lock-recovery.md` for a diagnosis procedure |
-| A decision made while fixing something | The decision record, with this entry citing it |
-
-**The third row is the one that gets violated on a project with no code.** It is
-tempting to seed this file with the ways trainsty is expected to break — a
-buffered SSE stream, a non-leader PID, a probe misreading `EPERM`. Those are
-predictions, and a log of predictions is unfalsifiable. They are already recorded
-where they were decided: `architecture/adr.md` → ADR-002, ADR-004 and ADR-008, and
-[`playbooks/stuck-lock-recovery.md`](playbooks/stuck-lock-recovery.md) for the
-diagnosis order.
+| A bug that is **known and unfixed** | A task line in `specs/**/tasks.md` |
+| A failure mode the design **anticipates** but has never seen | Not here — the record that decided the mitigation |
+| A decision made while fixing something | The decision record, with the entry citing it |
 
 ## Entries
 
-**None yet.** No Go code has been written, so nothing has broken.
+## 2026-09-14 — a wrapped suite ran before it held the lock
 
-The first entry will almost certainly concern the Lock failing to release, because
-that is the product's one catastrophic failure and it has five paths that can each
-fail independently. When it happens:
-[`playbooks/stuck-lock-recovery.md`](playbooks/stuck-lock-recovery.md) →
-*Afterwards* is the procedure, and **the `Prevention:` line must name which of the
-five release paths failed and which test would have caught it** — if no test
-covers it, that test is the fix.
+- **Symptom:** `wrap` as designed would start the suite, then queue for the Lock —
+  so two suites could run concurrently, which is the one thing the product exists to
+  prevent.
+- **Root cause:** `research.md` → R2 specified registering the **suite's** PID.
+  Registration validates group leadership, so the PID must exist first — meaning the
+  suite must be started before the Grant. The ordering is circular.
+- **Fix:** `wrap` makes **itself** a group leader, registers its own PID, waits, then
+  starts the suite as a child in its own group. `kill(-wrapPID)` still reaches the
+  whole tree.
+- **Prevention:** `TestAcceptanceTwoRunsQueueInOrder` asserts the second suite
+  produces **no output** while the first holds the Lock. A design that runs first and
+  queues second fails it immediately.
+
+## 2026-09-14 — Ctrl+C left the suite running and the lock held
+
+- **Symptom:** interrupting a wrapped run freed nothing. `TestAcceptanceInterrupt…`
+  timed out with the suite alive and the next waiter never promoted.
+- **Root cause:** the signal was forwarded to the direct child only. A POSIX shell
+  waiting on a foreground child **does not run its trap until that child exits**, so
+  `sh -c '…; sleep 300'` swallowed it entirely. Confirmed with a standalone shell
+  experiment before changing any code.
+- **Fix:** forward to the whole process group, once. `wrap` survives its own signal
+  because `signal.Notify` has already disabled the default action, and a re-entry
+  guard drops the copy it sent itself.
+- **Prevention:** the acceptance test asserts on the **suite's own recorded PID**, not
+  the registered one, so "wrap exited" can never be mistaken for "the suite died".
+  `knowledge/conventions/go.md` → *Signals and process groups* carries the rule.
+
+## 2026-09-14 — a registration for another user's process could hold the lock for ever
+
+- **Symptom:** `/register?pid=1` was accepted. The Lock could then only be freed by
+  the stream dropping — the probe never would, because `EPERM` correctly means alive.
+- **Root cause:** validation checked existence and group leadership, but not
+  **signalability**. `getpgid(2)` needs no permission, so another user's process
+  passes the leader check. The contract had always said the pid must be signalable;
+  the check was simply missing.
+- **Fix:** `process.Alive` is called during validation, and any error refuses the
+  registration.
+- **Prevention:** `TestRegisterRefusesAProcessOwnedByAnotherUser`, which skips only
+  when running as root — where the case is genuinely unreachable.
+
+## 2026-09-14 — the local CI gate reported a pass for an empty run
+
+- **Symptom:** after putting the acceptance suite behind a build tag, the gate's
+  acceptance job printed `✓ acceptance suite` while executing **no tests**.
+- **Root cause:** the tag was added to the files and not to the job's command, so
+  `-run TestAcceptance` matched nothing — and `go test` exits 0 for no tests. The tag
+  itself was needed because the suite otherwise ran **twice concurrently**, once via
+  `go test ./...`, and the two fought over port 45678.
+- **Fix:** the job passes `-tags e2e`, and **counts the cases first**, returning
+  "did not run" rather than a pass when the count is zero.
+- **Prevention:** the count guard is the test. Verified by removing the tag from the
+  `-list` call and confirming the job reports *refusing to report a pass for an empty
+  run*.
+
+## 2026-09-14 — the acceptance harness raced on its own output buffer
+
+- **Symptom:** `-race` reported a data race inside the acceptance tests, between
+  `os/exec`'s output copier and the test's polling goroutine.
+- **Root cause:** a plain `strings.Builder` used as `cmd.Stdout` and read
+  concurrently by `waitFor`.
+- **Fix:** a mutex-protected `syncBuffer`.
+- **Prevention:** `-race` is already a blocking gate, and this is the entry that
+  records why it is one for **test code** too — the race was in the harness, not the
+  product.
+
+## 2026-09-14 — "waiting for the lock" was never printed
+
+- **Symptom:** two contending suites queued correctly, and the promised
+  `trainsty: waiting for the lock…` line never appeared. Found by running two suites
+  by hand, not by a test.
+- **Root cause:** the announcement was checked inside the SSE read loop. The daemon
+  sends nothing until the Grant, so `ReadString` blocks for the whole wait and the
+  check is only reached once the Grant has arrived — exactly when the message is
+  useless.
+- **Fix:** a `time.AfterFunc` timer, stopped on the Grant.
+- **Prevention:** no automated test covers terminal progress output, and that gap is
+  stated rather than papered over: this one was found by using the tool, which is the
+  argument for `quickstart.md` being walked by hand and not only executed.

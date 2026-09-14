@@ -129,12 +129,12 @@ who is next.
 shows an advancing elapsed time and both waiters in grant order; stopping the daemon
 shows *cannot reach the scheduler*, distinct from an empty queue.
 
-- [ ] T040 [P] [US2] Write the scenario-6 acceptance test in `e2e_test.go`: `GET /` returns the page; with a Job and two Waiters `/status` carries an advancing `elapsedSeconds` and the queue in grant order (FR-021, FR-022, FR-026)
-- [ ] T041 [US2] Implement `dashboard/index.html`: one file, inline CSS and JS, **no framework, no build step, no CDN** — the daemon must work with no network. Poll `/status` every 2000 ms, render the Job and the queue as a **table** with headers, and show an **advancing elapsed time** rather than a static badge (FR-022, ADR-005)
-- [ ] T042 [US2] In `dashboard/index.html`, render every value from `/status` with **`textContent`, never `innerHTML`** — `repo` is developer-supplied, arrives as a query parameter, and lands on a page that can terminate process groups (FR-025)
-- [ ] T043 [US2] In `dashboard/index.html`, distinguish ***cannot reach the scheduler*** from ***nothing is running*** as separate visible states, recover from the former without a reload, and hold **no client-side state**: no cache, no `localStorage`, no optimistic update (FR-023, FR-024)
-- [ ] T044 [US2] Implement `dashboard/embed.go` with `//go:embed index.html` and serve it at `GET /`; every other path is `404` with an empty body. `go:embed` is what lets one binary serve a UI (ADR-001)
-- [ ] T045 [P] [US2] Write `dashboard/embed_test.go`: `GET /` serves the page with `text/html`; an unknown path is `404`; and the embedded bytes contain **no `innerHTML`** — a grep-able guard for T042 that survives future edits
+- [X] T040 [P] [US2] Write the scenario-6 acceptance test in `e2e_test.go`: `GET /` returns the page; with a Job and two Waiters `/status` carries an advancing `elapsedSeconds` and the queue in grant order (FR-021, FR-022, FR-026)
+- [X] T041 [US2] Implement `dashboard/index.html`: one file, inline CSS and JS, **no framework, no build step, no CDN** — the daemon must work with no network. Poll `/status` every 2000 ms, render the Job and the queue as a **table** with headers, and show an **advancing elapsed time** rather than a static badge (FR-022, ADR-005)
+- [X] T042 [US2] In `dashboard/index.html`, render every value from `/status` with **`textContent`, never `innerHTML`** — `repo` is developer-supplied, arrives as a query parameter, and lands on a page that can terminate process groups (FR-025)
+- [X] T043 [US2] In `dashboard/index.html`, distinguish ***cannot reach the scheduler*** from ***nothing is running*** as separate visible states, recover from the former without a reload, and hold **no client-side state**: no cache, no `localStorage`, no optimistic update (FR-023, FR-024)
+- [X] T044 [US2] Implement `dashboard/embed.go` with `//go:embed index.html` and serve it at `GET /`; every other path is `404` with an empty body. `go:embed` is what lets one binary serve a UI (ADR-001)
+- [X] T045 [P] [US2] Write `dashboard/embed_test.go`: `GET /` serves the page with `text/html`; an unknown path is `404`; and the embedded bytes contain **no `innerHTML`** — a grep-able guard for T042 that survives future edits
 
 **Checkpoint**: The Lock is observable. US1 still passes unchanged.
 
@@ -148,11 +148,11 @@ on.
 **Independent test**: quickstart scenario 7 — a suite with three children, Stop pressed,
 **zero** survivors, next waiter granted.
 
-- [ ] T046 [P] [US3] Write the scenario-7 acceptance test in `e2e_test.go`: wrap a suite that spawns three children, assert they exist, `POST /stop`, then assert **all of them are gone** and the next Waiter is granted (FR-027, FR-028, FR-029)
-- [ ] T047 [US3] Implement `POST /stop` in `httpapi/control.go`: take **no target parameter** so a stale page cannot name a suite that started after it rendered (FR-032), call `process.KillGroup` **outside the mutex** so `/status` stays answerable while the kill is in flight, then release and grant. Return `{"stopped":false}` with `200` when there is no Job (FR-031)
-- [ ] T048 [US3] Write `httpapi/stop_test.go`: a real child tree fully terminated and the Lock freed; `stopped:false` with `200` and no error when idle; and **a Stop arriving after the Job ended does not terminate its successor** (the stale-click case, FR-032)
-- [ ] T049 [US3] Add the Stop control to `dashboard/index.html`: a real `<button>` on the **Job's row only** — a Waiter has nothing to stop — that **confirms first**, naming the repo and stating the suite ends immediately, and posts with `Content-Type: application/json` and no body (FR-030, FR-033, SDR-001)
-- [ ] T050 [P] [US3] Extend `dashboard/embed_test.go`: the embedded page's Stop path sends the JSON content type and **no `pid`**, asserted against the embedded bytes
+- [X] T046 [P] [US3] Write the scenario-7 acceptance test in `e2e_test.go`: wrap a suite that spawns three children, assert they exist, `POST /stop`, then assert **all of them are gone** and the next Waiter is granted (FR-027, FR-028, FR-029)
+- [X] T047 [US3] Implement `POST /stop` in `httpapi/control.go`: take **no target parameter** so a stale page cannot name a suite that started after it rendered (FR-032), call `process.KillGroup` **outside the mutex** so `/status` stays answerable while the kill is in flight, then release and grant. Return `{"stopped":false}` with `200` when there is no Job (FR-031)
+- [X] T048 [US3] Write `httpapi/stop_test.go`: a real child tree fully terminated and the Lock freed; `stopped:false` with `200` and no error when idle; and **a Stop arriving after the Job ended does not terminate its successor** (the stale-click case, FR-032)
+- [X] T049 [US3] Add the Stop control to `dashboard/index.html`: a real `<button>` on the **Job's row only** — a Waiter has nothing to stop — that **confirms first**, naming the repo and stating the suite ends immediately, and posts with `Content-Type: application/json` and no body (FR-030, FR-033, SDR-001)
+- [X] T050 [P] [US3] Extend `dashboard/embed_test.go`: the embedded page's Stop path sends the JSON content type and **no `pid`**, asserted against the embedded bytes
 
 **Checkpoint**: All three stories complete. All ten quickstart scenarios pass.
 
@@ -165,13 +165,13 @@ constitution requires. **The first two are obligations, not tidying** — `RULES
 requires a restatement to move with the code that proves it, and both of these were
 deliberately deferred from the planning commit until the code existed.
 
-- [ ] T051 Update `knowledge/conventions/api.md`: replace the *"`WriteTimeout` and `IdleTimeout` must be zero"* guidance with the **per-request** `http.NewResponseController(w).SetWriteDeadline(time.Time{})` pattern, keeping both traps (the deadline and the missing `Flush()`) and citing research R1
-- [ ] T052 Update `knowledge/conventions/go.md` process rules: add that a child in its own process group **does not receive the terminal's `SIGINT`**, so a parent that puts it there MUST forward signals, and note the `SIGTTIN` consequence for suites that read the terminal (research R2)
-- [ ] T053 [P] Update `knowledge/architecture/structure.md`: the planned tree gained `daemonctl/` and `logpath/`, and `os/exec` is importable by `runner/` and `daemonctl/` **only** — record that as the grep-able rule it is
-- [ ] T054 [P] Update `README.md` Status table: Go code exists; state what is built and what the gate is. **Assert only what is in the tree** (`RULES.md` §6.6)
-- [ ] T055 Verify `go test -race -cover ./scheduler/` reports **≥80% statements** and that all five release paths have a test, per `knowledge/conventions/testing.md` → *Every release path has a test*. If a path lacks one, that test is the fix
-- [ ] T056 Run `scripts`-free gate sweep by hand and record it: `gofmt -l .` silent, `go vet ./...`, `go build ./...`, `go test -race ./...`. Confirm `go.mod` still has **no `require` block**
-- [ ] T057 Walk every scenario in `specs/001-serialize-e2e-runs/quickstart.md` end to end on a clean machine state, including scenario 10's *the daemon must not read its own log* check — the load-bearing half of DDR-002
+- [X] T051 Update `knowledge/conventions/api.md`: replace the *"`WriteTimeout` and `IdleTimeout` must be zero"* guidance with the **per-request** `http.NewResponseController(w).SetWriteDeadline(time.Time{})` pattern, keeping both traps (the deadline and the missing `Flush()`) and citing research R1
+- [X] T052 Update `knowledge/conventions/go.md` process rules: add that a child in its own process group **does not receive the terminal's `SIGINT`**, so a parent that puts it there MUST forward signals, and note the `SIGTTIN` consequence for suites that read the terminal (research R2)
+- [X] T053 [P] Update `knowledge/architecture/structure.md`: the planned tree gained `daemonctl/` and `logpath/`, and `os/exec` is importable by `runner/` and `daemonctl/` **only** — record that as the grep-able rule it is
+- [X] T054 [P] Update `README.md` Status table: Go code exists; state what is built and what the gate is. **Assert only what is in the tree** (`RULES.md` §6.6)
+- [X] T055 Verify `go test -race -cover ./scheduler/` reports **≥80% statements** and that all five release paths have a test, per `knowledge/conventions/testing.md` → *Every release path has a test*. If a path lacks one, that test is the fix
+- [X] T056 Run `scripts`-free gate sweep by hand and record it: `gofmt -l .` silent, `go vet ./...`, `go build ./...`, `go test -race ./...`. Confirm `go.mod` still has **no `require` block**
+- [X] T057 Walk every scenario in `specs/001-serialize-e2e-runs/quickstart.md` end to end. **All ten walked.** 1, 2, 3, 6, 7 and 9 are automated in `e2e_test.go`; 5, 8 and 10 were run by hand, including scenario 10's *the daemon must not read its own log* check — a fabricated line was appended and the next `start` still reported idle. **Scenario 4 was verified by the shortened equivalent quickstart.md itself proposes**, not by a real 32-minute wait: with `WriteTimeout` cut to 2s, a 7-second wait still succeeded, which is what proves the per-request deadline removal (R1). The full-length form remains unrun.
 - [x] T058 [P] ~~Add a hook under `.githooks/` running the gates~~ **DONE 2026-09-14, ahead of the phase.** `scripts/ci-local.sh` + `.githooks/pre-push` (running `--quick`) + `knowledge/playbooks/local-ci.md`. Landed early because the gates it enforces — `go.mod` declaring nothing, `os/exec` confined to `runner/` and `daemonctl/` — are cheaper to have before the code than to retrofit after. Wire it with `git config core.hooksPath .githooks`
 
 ---

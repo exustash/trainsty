@@ -1,6 +1,10 @@
 package httpapi
 
-import "net/http"
+import (
+	"net/http"
+
+	"github.com/exustash/trainsty/dashboard"
+)
 
 // handleStatus reports the whole state: the Job and the Queue in grant order.
 //
@@ -17,7 +21,16 @@ func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleRoot serves the dashboard at / and 404s everything else with an empty
-// body. The dashboard itself arrives with US2; until then / is a 404 too.
+// body. ServeMux routes "/" as a catch-all, so the path is checked explicitly.
 func (s *Server) handleRoot(w http.ResponseWriter, r *http.Request) {
-	w.WriteHeader(http.StatusNotFound)
+	if r.URL.Path != "/" {
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+	if r.Method != http.MethodGet {
+		w.Header().Set("Allow", http.MethodGet)
+		writeJSONError(w, http.StatusMethodNotAllowed, codeMethodNotAllowed)
+		return
+	}
+	dashboard.ServeHTTP(w, r)
 }

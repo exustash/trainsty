@@ -126,6 +126,26 @@ held rather than how many there are. [`../data/state.md`](../data/state.md) →
 - **`select` on both the Grant and `ctx.Done()`**, always. A Waiter that goes away
   while its Grant is in flight is the ordinary case, not an edge case.
 
+## Signals and process groups
+
+Three rules, each learned from a defect the acceptance suite caught:
+
+- **A child in its own process group does not receive the terminal's `SIGINT`.** The
+  terminal signals the *foreground* group only. A parent that moves a child out of
+  that group — which `wrap` must, so the suite can be terminated as a unit — is
+  responsible for forwarding, or `Ctrl+C` silently does nothing.
+- **Forward to the GROUP, not to the direct child.** A POSIX shell waiting on a
+  foreground child does not run its trap until that child exits, so
+  `sh -c '…; sleep 300'` swallows a signal sent only to the shell. Signalling the
+  group reaches every descendant, which is what a terminal does. The signalling
+  process survives its own signal because `signal.Notify` has already disabled the
+  default action — guard against re-entry so the forwarded copy is not forwarded
+  again.
+- **A suite in a background process group that reads the terminal gets `SIGTTIN`
+  and stops.** Interactive and watch-mode suites are therefore out of scope for a
+  queued batch run, and `trainsty help` says so. That is a property of job control,
+  not a limitation to engineer around.
+
 ## Doc comments
 
 Every exported identifier carries a doc comment, starting with its own name,

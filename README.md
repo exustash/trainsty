@@ -19,13 +19,13 @@ away.**
 Every choice above is recorded in
 [`knowledge/architecture/adr.md`](knowledge/architecture/adr.md).
 
-> **Nothing is built yet.** This repository currently holds a constitution and a
-> documentation set, and no Go code. The design is settled to the point where the
-> first handler can be written; what it does *not* contain is an implementation.
-> See [Status](#status).
+> **Feature 001 is built.** The daemon, `trainsty wrap`, the dashboard and Stop all
+> work, with the gate green and an eight-case acceptance suite driving the built
+> binary. See [Status](#status).
 >
 > **Check the tree before believing a document.** A described package is not a built
-> one.
+> one — and that rule earned its place: three defects in this repository were found
+> by running things rather than reading them.
 
 ---
 
@@ -76,10 +76,10 @@ are specified and each one is tested — `CLAUDE.md` → The Release Paths.
 | ---- | ----- |
 | Constitution | **Written and binding** — `.specify/memory/constitution.md`, v1.0.0. Five principles, and four of them forbid something that looks like an ordinary good idea |
 | Engineering conventions | **Written and binding** — `CLAUDE.md`, `RULES.md`, `CONTRIBUTING.md`, `knowledge/conventions/` |
-| Architecture | **Decided.** Eleven ADRs, including the three that go beyond the requirements note: the liveness signal (008), queue identity (007), and shutdown semantics (009) |
+| Architecture | **Decided and built.** Twelve ADRs, including the three that go beyond the requirements note: the liveness signal (008), queue identity (007), and shutdown semantics (009) |
 | Vocabulary | **Fixed.** Sixteen terms. Splits the note's single word *orphan* into an Orphaned Lock and an Orphaned Process |
 | Requirements | Mirrored from the Obsidian vault, verified byte-identical 2026-09-13. Two known disagreements await a **vault** edit, not a repository one |
-| Go code | **None.** No `go.mod`, no packages, no tests. `knowledge/architecture/structure.md` has the tree the first commit lands in |
+| Go code | **Built.** Six packages, ~2,400 lines with tests. `scheduler/` at 99% statement coverage against the constitution's 80% floor |
 | Git | Pushed to `git@github.com:exustash/trainsty.git` (**public**). `main` is protected: force-push and deletion refused for everyone, `enforce_admins` on |
 | CI | No workflow, so nothing on the remote checks `main`. **`scripts/ci-local.sh` is the gate**, with a `.githooks/pre-push` hook — wire it with `git config core.hooksPath .githooks` (`RULES.md` §7.3) |
 | Security posture | **Decided** — `knowledge/security/sdr.md` → SDR-001: loopback, POST-only, JSON content type, `Origin` check, and no shared secret. The residual is bounded by a stated condition, not by hope |
@@ -103,10 +103,10 @@ installs anywhere ([ADR-001](knowledge/architecture/adr.md)).
 
 ## Installation
 
-There is nothing to install yet. Once there is:
-
 ```bash
 go build -o trainsty .
+# then put it on your PATH, e.g.
+install -m 0755 trainsty /usr/local/bin/trainsty
 ```
 
 How the binary is distributed — `go install`, a Homebrew tap, or a released archive

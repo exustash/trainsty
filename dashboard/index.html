@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>trainsty</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #fbfbfa; --fg: #1a1a18; --muted: #6b6b66; --line: #e2e2dd;
+    --card: #ffffff; --accent: #1f5f4a; --warn: #8a4b1d; --stop: #a3231f;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #16171a; --fg: #e8e8e4; --muted: #9a9a94; --line: #2c2e33;
+      --card: #1d1f23; --accent: #6fcfae; --warn: #e0a76a; --stop: #e4736e;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 24px 16px; background: var(--bg); color: var(--fg);
+    font: 15px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  main { max-width: 780px; margin: 0 auto; }
+  h1 { font-size: 1.25rem; margin: 0 0 2px; letter-spacing: -0.01em; }
+  .sub { color: var(--muted); font-size: 0.85rem; margin: 0 0 20px; }
+  section { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 16px; margin-bottom: 16px; }
+  h2 { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); margin: 0 0 12px; font-weight: 600; }
+  table { width: 100%; border-collapse: collapse; }
+  th { text-align: left; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); font-weight: 600; padding: 0 8px 6px 0; }
+  td { padding: 7px 8px 7px 0; border-top: 1px solid var(--line); vertical-align: baseline; }
+  .repo { font-weight: 600; }
+  .mono { font-variant-numeric: tabular-nums; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.88rem; color: var(--muted); }
+  .empty { color: var(--muted); font-style: italic; }
+  .alert { color: var(--warn); font-weight: 600; }
+  button {
+    font: inherit; font-size: 0.85rem; font-weight: 600; color: #fff; background: var(--stop);
+    border: 0; border-radius: 6px; padding: 5px 12px; cursor: pointer;
+  }
+  button:hover { filter: brightness(1.1); }
+  button:focus-visible { outline: 2px solid var(--fg); outline-offset: 2px; }
+  footer { color: var(--muted); font-size: 0.78rem; text-align: center; }
+</style>
+</head>
+<body>
+<main>
+  <h1>trainsty</h1>
+  <p class="sub">One end-to-end suite at a time, on this machine.</p>
+
+  <section aria-labelledby="running-h">
+    <h2 id="running-h">Holding the lock</h2>
+    <div id="running"></div>
+  </section>
+
+  <section aria-labelledby="queue-h">
+    <h2 id="queue-h">Waiting</h2>
+    <div id="queue"></div>
+  </section>
+
+  <footer id="foot"></footer>
+</main>
+
+<script>
+// The page holds NO state. Everything rendered derives from the latest /status
+// response, so it can never disagree with the scheduler (Principle V).
+//
+// Every value is written with textContent, never innerHTML: `repo` is
+// developer-supplied, arrives as a query parameter, and lands on a page that can
+// terminate process groups.
+(function () {
+  "use strict";
+  var POLL_MS = 2000;
+  var running = document.getElementById("running");
+  var queue = document.getElementById("queue");
+  var foot = document.getElementById("foot");
+
+  function el(tag, text, cls) {
+    var n = document.createElement(tag);
+    if (text !== undefined && text !== null) { n.textContent = String(text); }
+    if (cls) { n.className = cls; }
+    return n;
+  }
+
+  function humanSeconds(s) {
+    s = Math.max(0, Math.floor(s || 0));
+    if (s < 60) { return s + "s"; }
+    var m = Math.floor(s / 60), r = s % 60;
+    if (m < 60) { return m + "m" + String(r).padStart(2, "0") + "s"; }
+    return Math.floor(m / 60) + "h" + String(m % 60).padStart(2, "0") + "m";
+  }
+
+  function clear(node) { while (node.firstChild) { node.removeChild(node.firstChild); } }
+
+  function table(headers, rows) {
+    var t = el("table"), thead = el("thead"), hr = el("tr");
+    headers.forEach(function (h) { hr.appendChild(el("th", h)); });
+    thead.appendChild(hr);
+    t.appendChild(thead);
+    var tb = el("tbody");
+    rows.forEach(function (cells) {
+      var tr = el("tr");
+      cells.forEach(function (c) {
+        var td = el("td");
+        if (c && c.nodeType === 1) { td.appendChild(c); } else { td.textContent = String(c); }
+        if (c && c.dataset && c.dataset.mono) { td.className = "mono"; }
+        tr.appendChild(td);
+      });
+      tb.appendChild(tr);
+    });
+    t.appendChild(tb);
+    return t;
+  }
+
+  function stopButton(repo) {
+    var b = el("button", "Stop");
+    b.type = "button";
+    b.addEventListener("click", function () {
+      // Confirmed because this is the one destructive control on the page, and the
+      // developer may well be looking at somebody else's run.
+      var ok = window.confirm(
+        "Stop " + repo + "?\n\nThe suite and everything it started are killed " +
+        "immediately. This cannot be undone.");
+      if (!ok) { return; }
+      b.disabled = true;
+      // Content-Type: application/json is part of the CSRF floor, and no pid is
+      // sent: a stale page must not be able to name a suite that started after it
+      // was rendered.
+      fetch("/stop", { method: "POST", headers: { "Content-Type": "application/json" } })
+        .catch(function () { /* the next poll reports the truth */ })
+        .then(function () { b.disabled = false; refresh(); });
+    });
+    return b;
+  }
+
+  function renderRunning(job) {
+    clear(running);
+    if (!job) {
+      running.appendChild(el("p", "Nothing holds the lock.", "empty"));
+      return;
+    }
+    var repo = el("span", job.repo, "repo");
+    var pid = el("span", "pid " + job.pid);
+    pid.dataset.mono = "1";
+    // An advancing elapsed time, never a static badge: the page can be seconds
+    // behind reality, and a counter tells the reader what they are looking at where
+    // a "running" label would simply be wrong for those seconds (ADR-005).
+    var elapsed = el("span", humanSeconds(job.elapsedSeconds));
+    elapsed.dataset.mono = "1";
+    running.appendChild(table(["Repository", "Process", "Elapsed", ""],
+      [[repo, pid, elapsed, stopButton(job.repo)]]));
+  }
+
+  function renderQueue(list) {
+    clear(queue);
+    if (!list || list.length === 0) {
+      queue.appendChild(el("p", "Nobody is waiting.", "empty"));
+      return;
+    }
+    var rows = list.map(function (w, i) {
+      var pos = el("span", String(i + 1));
+      pos.dataset.mono = "1";
+      var pid = el("span", "pid " + w.pid);
+      pid.dataset.mono = "1";
+      var wait = el("span", humanSeconds(w.waitingSeconds));
+      wait.dataset.mono = "1";
+      return [pos, el("span", w.repo, "repo"), pid, wait];
+    });
+    queue.appendChild(table(["#", "Repository", "Process", "Waiting"], rows));
+  }
+
+  function renderUnreachable() {
+    // Distinct from "nothing is running", and it must be TEXT rather than only a
+    // colour. Rendering an empty queue here would be the page lying.
+    clear(running);
+    clear(queue);
+    running.appendChild(el("p", "Cannot reach the scheduler on port 45678.", "alert"));
+    running.appendChild(el("p", "Start it with: trainsty start", "empty"));
+    queue.appendChild(el("p", "Unknown — the scheduler is not answering.", "empty"));
+  }
+
+  function refresh() {
+    return fetch("/status", { cache: "no-store" })
+      .then(function (r) {
+        if (!r.ok) { throw new Error("status " + r.status); }
+        return r.json();
+      })
+      .then(function (snap) {
+        renderRunning(snap.job);
+        renderQueue(snap.queue);
+        foot.textContent = "Updated " + new Date().toLocaleTimeString() +
+          " · refreshing every " + (POLL_MS / 1000) + "s";
+      })
+      .catch(function () {
+        renderUnreachable();
+        // Keeps trying without a reload, and says the last attempt failed rather
+        // than leaving a stale timestamp that reads as fresh.
+        foot.textContent = "Last attempt failed at " + new Date().toLocaleTimeString() +
+          " · still retrying";
+      });
+  }
+
+  refresh();
+  setInterval(refresh, POLL_MS);
+})();
+</script>
+</body>
+</html>

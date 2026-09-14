@@ -57,15 +57,28 @@ data: {"pid":12345,"grantedAt":"2026-09-13T10:04:11Z"}
 
 Four ways to get this wrong, all of which pass a short test:
 
-- **`http.Server.WriteTimeout` and `IdleTimeout` must be zero.** A non-zero
-  `WriteTimeout` severs the wait the endpoint exists to hold open — and it does it
-  at the timeout, so a suite that queues for 90 seconds passes and one that queues
-  for 20 minutes does not. This is the single most likely way to ship a broken
-  Daemon (ADR-004). `ReadHeaderTimeout` **should** be set; it bounds the headers,
-  not the body.
-- **`Flush()` after the event, or it never arrives.** Go buffers the response;
-  without an explicit `http.Flusher.Flush()` the Grant sits in the buffer and the
-  Runner waits forever while every metric looks healthy.
+- **Remove the write deadline PER REQUEST, and leave `Server.WriteTimeout` set.**
+  A non-zero `WriteTimeout` severs the wait the endpoint exists to hold open — at
+  the timeout, so a suite that queues for 90 seconds passes and one that queues for
+  20 minutes does not. This is the single most likely way to ship a broken Daemon
+  (ADR-004).
+
+  ```go
+  rc := http.NewResponseController(w)
+  if err := rc.SetWriteDeadline(time.Time{}); err != nil { /* refuse, do not hang */ }
+  ```
+
+  **A zero value means no deadline, for this request only** (Go 1.20+, and what sets
+  the language floor). Zeroing `Server.WriteTimeout` instead would work and would
+  throw the protection away on the other four routes — **the earlier version of this
+  document prescribed exactly that**, and `specs/001-serialize-e2e-runs/research.md`
+  → R1 corrected it. `ReadHeaderTimeout` stays set; it bounds the headers, not the
+  body.
+- **Flush after the headers AND after the event, or the Grant never arrives.** Go
+  buffers the response; without a flush the Grant sits in the buffer and the Runner
+  waits for ever while everything looks healthy. Use the same `ResponseController` —
+  its `Flush() error` reports a vanished client, where `http.Flusher.Flush()`
+  cannot.
 - **Refuse a `pid` that is not a group leader.** `400` with
   `{"error":"not_group_leader"}`. The Daemon cannot otherwise know, and the
   consequence of accepting one is signalling the developer's own shell — ADR-002.
