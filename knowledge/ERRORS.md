@@ -118,3 +118,19 @@ Maximum three lines per section. Keep it scannable.
 - **Prevention:** no automated test covers terminal progress output, and that gap is
   stated rather than papered over: this one was found by using the tool, which is the
   argument for `quickstart.md` being walked by hand and not only executed.
+
+## 2026-09-14 — an unreadable shutdown answer dropped the orphan warning
+
+- **Symptom:** `trainsty stop --force` against a running suite printed
+  `trainsty: stopped` instead of warning that the suite was left running,
+  unsupervised. Found by convergence review, not by use.
+- **Root cause:** the `/shutdown` response body was decoded with the error
+  discarded, so a truncated body left `jobWasActive` false. A daemon exiting
+  mid-write is exactly when a suite was running, and `--force` has no pre-flight
+  warning to fall back on — so the only path that lost the message was the one
+  that needed it.
+- **Fix:** the daemon's answer still wins when it decodes; the pre-flight status
+  snapshot is the fallback.
+- **Prevention:** `daemonctl.TestStopStillWarnsWhenTheShutdownAnswerCannotBeRead`
+  serves a truncated body and asserts the warning survives. Watched failing first —
+  it reported `trainsty: stopped`.
