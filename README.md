@@ -83,7 +83,7 @@ are specified and each one is tested — `CLAUDE.md` → The Release Paths.
 | Git | Pushed to `git@github.com:exustash/trainsty.git` (**public**). `main` is protected: force-push and deletion refused for everyone, `enforce_admins` on |
 | CI | No workflow, so nothing on the remote checks `main`. **`scripts/ci-local.sh` is the gate**, with a `.githooks/pre-push` hook — wire it with `git config core.hooksPath .githooks` (`RULES.md` §7.3) |
 | Security posture | **Decided** — `knowledge/security/sdr.md` → SDR-001: loopback, POST-only, JSON content type, `Origin` check, and no shared secret. The residual is bounded by a stated condition, not by hope |
-| Distribution | **Undecided** — `OD-4`. Build from source meanwhile |
+| Distribution | **Decided** — [ADR-013](knowledge/architecture/adr.md): tagged release archives for four Unix targets, with `go install` alongside. A Homebrew tap is not taken up |
 
 ---
 
@@ -91,7 +91,7 @@ are specified and each one is tested — `CLAUDE.md` → The Release Paths.
 
 | Dependency | Version | Notes |
 | ---------- | ------- | ----- |
-| Go | 1.16+ | `embed` is the oldest feature required. Verified against go1.27.1 darwin/arm64; no other build tooling is used |
+| Go | 1.20+ | **Only to build from source or use `go install`** — a downloaded binary needs nothing. 1.20 is the floor because `http.NewResponseController` is what lets a 30-minute queue wait survive without disabling write timeouts server-wide. Verified against go1.27.1 darwin/arm64 |
 | Linux or macOS | — | Unix only. Process-group termination is the product, not a detail ([ADR-002](knowledge/architecture/adr.md)) |
 | `setsid` | — | Needed by the **Runner**, not by trainsty. Present on Linux; on macOS it comes from Homebrew's `util-linux` |
 
@@ -103,14 +103,45 @@ installs anywhere ([ADR-001](knowledge/architecture/adr.md)).
 
 ## Installation
 
+**Download a binary** — no toolchain, no package manager, nothing else to install.
+Pick your platform from
+[the latest release](https://github.com/exustash/trainsty/releases/latest):
+
 ```bash
-go build -o trainsty .
-# then put it on your PATH, e.g.
+curl -L https://github.com/exustash/trainsty/releases/download/v1.0.0/trainsty_v1.0.0_darwin_arm64.tar.gz | tar xz
 install -m 0755 trainsty /usr/local/bin/trainsty
 ```
 
-How the binary is distributed — `go install`, a Homebrew tap, or a released archive
-— is **not decided** (`OD-4`).
+Archives are published for `darwin/arm64`, `darwin/amd64`, `linux/amd64` and
+`linux/arm64`, built `CGO_ENABLED=0` so each one is genuinely static. Verify a
+download against the release's `SHA256SUMS` — this binary terminates process groups,
+so it is worth the one command:
+
+```bash
+shasum -a 256 -c SHA256SUMS
+```
+
+**Or with Go**, if you have it:
+
+```bash
+go install github.com/exustash/trainsty@latest
+```
+
+**Or from source:**
+
+```bash
+go build -o trainsty .
+install -m 0755 trainsty /usr/local/bin/trainsty
+```
+
+`trainsty version` reports which of these you got — the version, the commit it was
+built from, the toolchain and the platform. That is the first line to paste into a
+bug report.
+
+**The download is the channel that matters**, and not by preference: the
+constitution's Principle I says installation MUST never *require* a language runtime
+or a package manager, so `go install` can only ever be an addition to it
+([ADR-013](knowledge/architecture/adr.md)).
 
 ---
 

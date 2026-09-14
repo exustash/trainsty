@@ -102,7 +102,7 @@ table exists so the note's silences are visible from the product side too.
 | # | Question | Tracked as |
 | - | -------- | ---------- |
 | Q-3 | Does `repo` mean anything to the daemon beyond a label? | OD-3 |
-| Q-4 | How is the binary distributed — `go install`, a tap, or a release archive? The note says "globally installed" without saying how | OD-4 |
+| Q-4 | How is the binary distributed — `go install`, a tap, or a release archive? The note says "globally installed" without saying how | **Closed 2026-09-14** — [ADR-013](../architecture/adr.md): release archives, `go install` alongside, no tap |
 
 **Closed 2026-09-13** by `specs/001-serialize-e2e-runs/spec.md`'s clarification round:
 

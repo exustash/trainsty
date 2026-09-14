@@ -43,7 +43,6 @@ Recorded here so they are not made silently in a pull request.
 | # | Decision | Blocks |
 | - | -------- | ------ |
 | OD-3 | **Whether `repo` means anything to the Daemon.** Today it is a display label for the Dashboard. If it ever gates anything — per-repository queues, a concurrency above 1 — that is a MAJOR constitution amendment, not a feature | Nothing yet. Recorded so the field is not quietly promoted |
-| OD-4 | **How the binary is distributed.** `go install`, a Homebrew tap, or a released archive. The constitution fixes *one static binary*; it does not fix how it arrives | The install instructions in `README.md`, which today say *build from source* |
 
 **Closed by the requirements note itself**, and recorded below rather than
 treated as defaults: the language and distribution shape (ADR-001), the platform
@@ -64,8 +63,45 @@ round forced all three:
   [`../data/ddr.md`](../data/ddr.md) → **DDR-002**, now accepted.
 - **The Runner ships**, as `trainsty wrap` — **ADR-012** below. This was not an `OD-`
   row at all, because nothing here had recorded that it was a question.
+- **`OD-4` — how the binary is distributed.** A released archive, with `go install`
+  alongside it: **ADR-013** below, now accepted.
 
 ## Decisions
+
+## ADR-013 — A released archive is the distribution channel, with `go install` beside it
+
+- **Status:** accepted
+- **Date:** 2026-09-14
+- **Context:** `OD-4` listed three candidates — a released archive, `go install`, and
+  a Homebrew tap — as though they were peers to be ranked on convenience. They are
+  not peers, and the constitution already said so: Principle I requires that
+  *"installation MUST never require a language runtime, package manager, or service
+  manager."* `go install` requires the Go toolchain; a Homebrew tap requires a package
+  manager. Either one as the **only** channel violates Principle I.
+- **Decision:** ship **tagged release archives** — `darwin/{arm64,amd64}` and
+  `linux/{amd64,arm64}`, built `CGO_ENABLED=0` so each binary is genuinely static —
+  plus a `SHA256SUMS`. `go install github.com/exustash/trainsty@vX.Y.Z` is supported
+  **alongside** it, which costs nothing: the module path already resolves and
+  `package main` is at the repository root. A Homebrew tap is **not** taken up.
+- **Consequences:**
+  - The archive is the channel that satisfies Principle I on its own. The other two
+    are permitted precisely because they are then not *required*.
+  - `scripts/release.sh` builds and checksums; it never publishes. Publishing stays a
+    deliberate step under `RULES.md` §1.3.
+  - **The version is read from the build, never injected.**
+    `runtime/debug.ReadBuildInfo` reports the module version for a `go install` build
+    and the VCS revision for one built from a checkout, so the tag is the only source
+    of truth and the release step has nothing to keep in sync. A proxy build carries
+    no revision, correctly: it is a zip, not a checkout.
+  - **A published version is immutable.** The Go module proxy caches a tag
+    permanently once anything fetches it, so a bad release is corrected by a new
+    version, never by re-cutting one — the same shape as `main` refusing a force-push.
+  - A tap remains available later. It would depend on these archives rather than
+    replace them, and it is worth its maintenance only once someone other than the
+    maintainer is installing this.
+- **Alternatives considered:** a Homebrew tap now — best upgrade story
+  (`brew upgrade`), but a second repository and a formula bump per release, for an
+  audience of one so far. `go install` alone — zero work, and a Principle I violation.
 
 ## ADR-012 — `trainsty wrap` ships the Runner, and it is a client rather than the Daemon
 

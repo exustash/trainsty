@@ -78,7 +78,10 @@ project the irreversible things are mostly other people's processes:
 - **Anything that writes outside the repository** — a log path, a state file, a
   launch agent. DDR-001 and DDR-002 make each one a decision, not an implementation
   detail.
-- **Publishing the binary**, or any distribution step (OD-4 is open).
+- **Publishing the binary** — a tag, a release, anything that reaches the module
+  proxy. The channel is settled (ADR-013); *cutting* a release is still a deliberate
+  step, and **a published version is immutable**: the proxy caches a tag permanently,
+  so a bad release is corrected by a new version, never by re-cutting one.
 - **Deletion of presumed dead code files.**
 - **`git push --force`, branch deletion, history rewriting**, once there is a
   remote.

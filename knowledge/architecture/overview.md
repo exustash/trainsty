@@ -119,12 +119,16 @@ as a defect.
 
 ## Open decisions
 
-Each needs a record before the corresponding code is written. All four are in
-[adr.md](adr.md) → *Open decisions*:
+Each needs a record before the corresponding code is written. **One is still open**,
+in [adr.md](adr.md) → *Open decisions*:
 
 - **OD-3 — whether `repo` ever means anything.** Recorded so it cannot become a
   back door to a concurrency above 1.
-- **OD-4 — how the binary is distributed.**
+
+**OD-4 closed on 2026-09-14** — ADR-013: tagged release archives for four Unix
+targets, with `go install` alongside. Principle I is what ranked them: it forbids
+installation *requiring* a toolchain or a package manager, so the archive is the
+channel and the others may only accompany it.
 
 **OD-1 and OD-2 closed on 2026-09-13** — SDR-001 and DDR-002 respectively, both forced
 by `specs/001-serialize-e2e-runs/spec.md`'s clarification round.

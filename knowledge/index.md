@@ -112,11 +112,12 @@ The stable half of the knowledge base. All four are auto-loaded.
   `kill(pid, 0)` returns `EPERM` for another user's live process and succeeds for a
   reused PID; ADR-007 keys the Queue by PID so a reconnect is not starved; ADR-009
   makes a shutdown release the Job **without killing it**, and that asymmetry is a
-  behaviour to assert, not an implementation detail. **ADR-012 is the newest**: the
-  product ships the Runner as `trainsty wrap`, and the record exists mostly to say why
-  process-spawning code does not violate Principle II — `wrap` is a client, and the
-  principle constrains the Daemon. Two open decisions remain (**OD-3**, **OD-4**);
-  OD-1 and OD-2 closed on 2026-09-13.
+  behaviour to assert, not an implementation detail. **ADR-013 is the newest**: the
+  binary ships as a tagged release archive, with `go install` alongside rather than
+  instead — Principle I forbids requiring a toolchain. ADR-012 before it says why
+  process-spawning code does not violate Principle II: `wrap` is a client, and the
+  principle constrains the Daemon. **One open decision remains (OD-3)**; OD-1 and
+  OD-2 closed on 2026-09-13, OD-4 on 2026-09-14.
 - [Repository Structure](architecture/structure.md) — what exists today (no Go
   code, an empty remote) and the tree the first commit lands in. Names the
   four things absent on purpose, including `internal/` and a `Makefile`.
