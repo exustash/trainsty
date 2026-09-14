@@ -35,6 +35,7 @@ Every choice above is recorded in
 - [Status](#status)
 - [Prerequisites](#prerequisites)
 - [Installation](#installation)
+- [Running it, step by step](#running-it-step-by-step)
 - [Usage](#usage)
 - [Integrating a repository](#integrating-a-repository)
 - [Development](#development)
@@ -145,6 +146,129 @@ or a package manager, so `go install` can only ever be an addition to it
 
 ---
 
+## Running it, step by step
+
+Output below is copied from a real run on 2026-09-14, with two substitutions: the
+home directory is generalised, and the suite is a stand-in (`sh -c` doing nothing
+useful) rather than a real `npm run test:e2e`. The scheduler's own lines are verbatim.
+The two clones were throwaway repositories named `demo-repo` and `demo-two`.
+
+### 1. Check what you installed
+
+```console
+$ trainsty version
+trainsty v1.0.0 (721487d0ecef, go1.27.1, darwin/arm64)
+```
+
+The version, the commit it was built from, the toolchain and the platform. This is
+the line to paste into a bug report.
+
+### 2. Start the scheduler
+
+```console
+$ trainsty start
+trainsty: listening on http://localhost:45678
+trainsty: logging to /Users/you/Library/Logs/trainsty.log
+```
+
+It detaches and gives your terminal back — one scheduler serves every clone on the
+machine, so you do this once, not once per repository. The log path is printed
+because you should not have to discover it during an incident.
+
+**If this fails**, the message says which of two things happened, because the
+remedies differ ([ADR-011](knowledge/architecture/adr.md)): a scheduler is already
+running (nothing to do), or something else holds the port. For the second:
+
+```bash
+lsof -nP -iTCP:45678
+```
+
+### 3. Confirm it is up
+
+```console
+$ trainsty status
+idle: nothing holds the lock
+waiting: 0
+```
+
+With no scheduler reachable you get a different answer **and exit code 3**, so a
+script can tell *no scheduler* from *scheduler says no*:
+
+```console
+$ trainsty status
+trainsty: no scheduler reachable on port 45678
+$ echo $?
+3
+```
+
+### 4. Run a suite under the lock
+
+Put `trainsty wrap --` in front of whatever command runs your suite:
+
+```console
+$ trainsty wrap -- npm run test:e2e
+```
+
+Nothing is printed by trainsty when the lock is free — your suite just runs, with
+its output untouched, and exits with its own status.
+
+### 5. Watch a second clone queue behind the first
+
+In another terminal, in a different clone, run the same thing. This is the whole
+product:
+
+```console
+$ trainsty wrap -- npm run test:e2e
+trainsty: waiting for the lock…
+trainsty: granted after 5s
+  > second suite
+```
+
+While that is happening, `status` from anywhere shows both:
+
+```console
+$ trainsty status
+running: demo-repo (pid 51839) for 3s
+waiting: 1
+  1. demo-two (pid 51879) for 2s
+```
+
+`Ctrl+C` in the first terminal frees the lock within about two seconds and the
+second suite starts. So does closing the terminal, and so does the suite being
+killed outright — there are **five** release paths and none of them needs you to
+clean up.
+
+### 6. See it in a browser
+
+```bash
+trainsty ui        # or open http://localhost:45678
+```
+
+The active job with a ticking elapsed time, the queue in order, and a Stop button on
+the running job. Stop terminates that suite **and every process it started** —
+headless browsers included — then hands the lock to the next in line. It asks first,
+naming the repository.
+
+### 7. Shut the scheduler down
+
+```console
+$ trainsty stop
+trainsty: stopped
+```
+
+**If a suite is running, this warns and asks first**, and the warning is the
+important part: shutting down releases the lock but does **not** stop that suite
+([ADR-009](knowledge/architecture/adr.md)). It keeps running, and the next scheduler
+knows nothing about it. `--force` skips the prompt; with no terminal to ask,
+`trainsty stop` refuses rather than assume yes.
+
+### 8. Make it permanent
+
+Steps 4 and 5 were the product. To keep it, change one line in the repository's
+local CI script — see [Integrating a repository](#integrating-a-repository).
+
+---
+
 ## Usage
 
 ```bash
@@ -157,21 +281,18 @@ trainsty version   # version, commit, toolchain and platform
 trainsty help      # the commands, and what trainsty is for
 ```
 
-The dashboard is at **<http://localhost:45678>** — it shows the active job, the
-queue in order, and a Stop button for the job that is running.
+A reference; [Running it, step by step](#running-it-step-by-step) is the walkthrough
+with real output. The dashboard is at **<http://localhost:45678>**.
 
-Three things worth knowing before you use it:
+Two things the walkthrough does not cover:
 
 - **`trainsty stop` while a suite is running releases the lock but does not kill the
-  suite** ([ADR-009](knowledge/architecture/adr.md)). The tests keep going, and the
-  next daemon knows nothing about them. The command warns and asks first.
-- **The port is 45678, hardcoded, with no fallback.** A failed bind means either a
-  daemon is already running or something else holds the port — the error says which
-  to check, and the remedies differ ([ADR-011](knowledge/architecture/adr.md)).
+  suite** ([ADR-009](knowledge/architecture/adr.md)) — repeated here because it is the
+  one command that can leave work running unsupervised. It warns and asks first.
 - **The dashboard can be ~7 seconds behind** for a job that died without closing its
-  connection. That is why it shows a ticking elapsed time rather than a *running*
-  badge — a counter tells you what you are looking at
-  ([ADR-005](knowledge/architecture/adr.md)).
+  connection, so it shows a ticking elapsed time rather than a *running* badge: a
+  counter tells you what you are looking at, where a static label would simply be
+  wrong for those seconds ([ADR-005](knowledge/architecture/adr.md)).
 
 ---
 
