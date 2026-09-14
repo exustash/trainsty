@@ -2,16 +2,17 @@
 okf_version: "0.1"
 type: architecture-note
 title: "Architecture — Overview"
-description: "How trainsty is shaped: one daemon holding one lock, four packages with a strict dependency direction, and the three boundaries that matter — the API the Runner speaks, the syscall seam, and the mutex. Includes the full lifecycle of one job and an index of the decisions already recorded."
+description: "How trainsty is shaped: one daemon holding one lock, eight packages with a strict dependency direction, and the three boundaries that matter — the API the Runner speaks, the syscall seam, and the mutex. Includes the full lifecycle of one job and an index of the decisions already recorded."
 tags: [architecture, overview, go, scheduler, lifecycle]
-timestamp: "2026-09-13"
+timestamp: "2026-09-14"
 ---
 
 # Architecture — Overview
 
-> **Nothing is built yet.** The module boundaries below are binding as design, and
+> **The module boundaries below are built** — `v1.0.0`, eight packages — and
 > `CLAUDE.md` → **Repository Architecture** is the authoritative statement of them.
-> This file is the *why*, and the sequence diagram a listing cannot show.
+> This file is the *why*, and the sequence diagram a listing cannot show;
+> [structure.md](structure.md) is the file-by-file map.
 
 ## The system in one paragraph
 

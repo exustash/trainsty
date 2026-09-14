@@ -118,9 +118,9 @@ The stable half of the knowledge base. All four are auto-loaded.
   process-spawning code does not violate Principle II: `wrap` is a client, and the
   principle constrains the Daemon. **One open decision remains (OD-3)**; OD-1 and
   OD-2 closed on 2026-09-13, OD-4 on 2026-09-14.
-- [Repository Structure](architecture/structure.md) — what exists today (no Go
-  code, an empty remote) and the tree the first commit lands in. Names the
-  four things absent on purpose, including `internal/` and a `Makefile`.
+- [Repository Structure](architecture/structure.md) — the file-by-file map of the
+  eight packages, what each file is for, and the names that are not free to change.
+  Names the five things absent on purpose, including `internal/` and a `Makefile`.
 
 ### Data
 

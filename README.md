@@ -79,7 +79,7 @@ are specified and each one is tested — `CLAUDE.md` → The Release Paths.
 | Architecture | **Decided and built.** Twelve ADRs, including the three that go beyond the requirements note: the liveness signal (008), queue identity (007), and shutdown semantics (009) |
 | Vocabulary | **Fixed.** Sixteen terms. Splits the note's single word *orphan* into an Orphaned Lock and an Orphaned Process |
 | Requirements | Mirrored from the Obsidian vault, verified byte-identical 2026-09-13. Two known disagreements await a **vault** edit, not a repository one |
-| Go code | **Built.** Six packages, ~2,400 lines with tests. `scheduler/` at 99% statement coverage against the constitution's 80% floor |
+| Go code | **Built and released as `v1.0.0`.** Eight packages, 39 files — ~2,000 lines of implementation and ~3,100 of tests. `scheduler/` at 99% statement coverage against the constitution's 80% floor |
 | Git | Pushed to `git@github.com:exustash/trainsty.git` (**public**). `main` is protected: force-push and deletion refused for everyone, `enforce_admins` on |
 | CI | No workflow, so nothing on the remote checks `main`. **`scripts/ci-local.sh` is the gate**, with a `.githooks/pre-push` hook — wire it with `git config core.hooksPath .githooks` (`RULES.md` §7.3) |
 | Security posture | **Decided** — `knowledge/security/sdr.md` → SDR-001: loopback, POST-only, JSON content type, `Origin` check, and no shared secret. The residual is bounded by a stated condition, not by hope |

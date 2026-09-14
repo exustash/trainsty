@@ -79,12 +79,15 @@ Three consequences shape nearly every rule below:
   reclaims orphaned headless browsers, and it is also what can kill a developer's
   shell if the registered PID is not a group leader.
 
-> **Nothing is built yet.** There is no Go code — only this documentation set and
-> a constitution, on a fresh `main` with an empty remote. Every module boundary
-> below is binding as design; nothing below describes code you can read.
-> `knowledge/architecture/structure.md` says what exists and what is planned —
-> **check the repository, not a document**, and never assert that something is
-> wired because a document describes it.
+> **The code exists.** Eight packages, 39 Go files, ~2,000 lines of implementation
+> and ~3,100 of tests, released as `v1.0.0` (ADR-013). So every module boundary below
+> describes code you can read, not a design you have to imagine.
+> `knowledge/architecture/structure.md` is the file-by-file map.
+>
+> **The instruction that outlives that fact:** never assert that something is wired
+> because a document describes it. **Check the tree.** This very block claimed for a
+> day that no Go code existed, while several thousand lines of it sat beside the
+> claim — which is the argument for the rule, not against it.
 
 **Requirement precedence, a strict order:**
 `knowledge/product/local-ci-scheduler-requirements.md` (what the product is) →

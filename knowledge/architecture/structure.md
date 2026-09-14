@@ -2,9 +2,9 @@
 okf_version: "0.1"
 type: architecture-note
 title: "Repository Structure"
-description: "The repository as it actually stands — documentation and a constitution, with no Go code yet — and the intended tree the first commit of code lands in. Says which parts exist today, which are planned, and which file is a read-only mirror."
+description: "The repository as it actually stands: the eight Go packages file by file, the documentation set beside them, the names that are not free to change, and which file is a read-only mirror."
 tags: [architecture, structure, layout]
-timestamp: "2026-09-13"
+timestamp: "2026-09-14"
 ---
 
 # Repository Structure
@@ -16,13 +16,15 @@ does not, and which file must not be edited in place.
 
 ## What exists today
 
-**No Go code.** The project is documentation, a constitution, and a vendored Spec
-Kit, on a fresh `main` whose remote is empty.
+**All of it.** The Go tree below is built and released as `v1.0.0` (ADR-013), and
+`main` is pushed. Beside the code sit the documentation set, the constitution, and a
+vendored Spec Kit:
 
 ```text
 trainsty/
 ├── CLAUDE.md                  # conventions, auto-loaded every session
 ├── RULES.md                   # operating rules
+├── LICENSE                    # MIT — required before binaries could ship (ADR-013)
 ├── .gitignore                 # Go output; .claude/skills/ IS tracked
 ├── CONTRIBUTING.md            # workflow
 ├── README.md
@@ -53,6 +55,7 @@ trainsty/
 ├── go.mod                      # requires NOTHING — ADR-001, enforced by ci-local.sh
 ├── main.go                     # subcommand dispatch only; the table is help's source
 ├── doc.go                      # what trainsty is, for `go doc`
+├── version.go                  # `trainsty version` — read from the build, not -ldflags
 ├── scheduler/                  # the Lock and the Queue. No net/http, no syscall
 │   ├── scheduler.go            #   Register, Grant, Release, Withdraw, Snapshot
 │   └── scheduler_test.go       #   99% statements; the constitution's floor is 80%
@@ -84,6 +87,7 @@ trainsty/
 │   └── embed_test.go           #   greps the page for .innerHTML and remote URLs
 ├── e2e_test.go                 # ACCEPTANCE — build tag `e2e`, see below
 ├── scripts/ci-local.sh         # the merge gate
+├── scripts/release.sh          # builds the four release archives + SHA256SUMS
 └── .githooks/pre-push          # runs ci-local.sh --quick
 ```
 
@@ -105,7 +109,7 @@ version of that fix turned the failure into a false green.
 
 ## What is deliberately absent from the tree
 
-- **No `internal/`.** Four packages in one small binary; the extra path segment
+- **No `internal/`.** Eight packages in one small binary; the extra path segment
   buys nothing and `go.mod` already makes the module private in practice.
 - **No `cmd/trainsty/`.** One binary, so `main.go` at the root is the shorter
   truth. Add the directory when there is a second binary, not before.
@@ -113,6 +117,7 @@ version of that fix turned the failure into a false green.
   (ADR-011), nothing persisted (DDR-001), and the one asset is embedded.
 - **No `Makefile`.** `go build`, `go test -race ./...`, `gofmt -l .`. A wrapper
   over three commands is a fourth thing to keep correct.
-- **No `.github/`.** The remote exists but nothing is pushed, so there is nothing
-  for a workflow to run. When there is, the gate is the four commands in
-  `RULES.md` §3.3, which `CONTRIBUTING.md` already names.
+- **No `.github/`.** `main` is pushed and `v1.0.0` is released, so this is now a
+  deliberate gap rather than an empty one: `scripts/ci-local.sh` is the gate and
+  nothing on the remote checks what lands (`RULES.md` §7.3). A workflow would run
+  the same jobs; until one exists, `.githooks/pre-push` is the only enforcement.

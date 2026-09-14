@@ -2,9 +2,9 @@
 okf_version: "0.1"
 type: decision-record
 title: "Architecture Decision Records"
-description: "Log of architectural decisions for trainsty, newest first. Records the stack — Go, one static binary, stdlib only, the dashboard embedded with go:embed — and the scheduling architecture: the daemon is a traffic light the Runner obeys (003), termination targets the process group (002), the queue wait is Server-Sent Events (004), the dashboard polls and nothing is pushed to it (005), the lock is FIFO with exactly one holder (006), a reconnect keeps its queue position (007), the open registration is the primary liveness signal and the PID probe only its backstop (008), a shutdown releases the job without killing it (009), and the command is named trainsty rather than the note's e2e-scheduler (010). Also carries the decisions still open, including who may call /stop."
+description: "Log of architectural decisions for trainsty, newest first. Records the stack — Go, one static binary, stdlib only, the dashboard embedded with go:embed — and the scheduling architecture: the daemon is a traffic light the Runner obeys (003), termination targets the process group (002), the queue wait is Server-Sent Events (004), the dashboard polls and nothing is pushed to it (005), the lock is FIFO with exactly one holder (006), a reconnect keeps its queue position (007), the open registration is the primary liveness signal and the PID probe only its backstop (008), a shutdown releases the job without killing it (009), the command is named trainsty rather than the note's e2e-scheduler (010), the port bind is the single-instance mechanism (011), trainsty wrap ships the Runner as a client (012), and the binary ships as a release archive with go install alongside (013). OD-3 is the one decision still open."
 tags: [architecture, adr, decisions, go, scheduler]
-timestamp: "2026-09-13"
+timestamp: "2026-09-14"
 ---
 
 # Architecture Decision Records
