@@ -1,12 +1,10 @@
 package httpapi
 
 import (
-	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
-	"syscall"
 	"time"
 
 	"github.com/exustash/trainsty/process"
@@ -125,9 +123,8 @@ func parseRegistration(r *http.Request) (pid int, repo string, code string) {
 
 	leader, err := process.IsGroupLeader(pid)
 	if err != nil {
-		if errors.Is(err, syscall.ESRCH) {
-			return 0, "", codeNoSuchProcess
-		}
+		// Any error here is effectively ESRCH: getpgid(2) needs no permission, so
+		// the only thing that fails is a pid that has gone since the check above.
 		return 0, "", codeNoSuchProcess
 	}
 	if !leader {
