@@ -2,6 +2,7 @@ package daemonctl
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -129,5 +130,35 @@ func TestStopSucceedsWhenNoDaemonIsReachable(t *testing.T) {
 func TestIsTerminalIsFalseForANonDevice(t *testing.T) {
 	if isTerminal(strings.NewReader("")) {
 		t.Fatal("a strings.Reader is not a terminal")
+	}
+}
+
+// The warning that a suite was left running is the whole point of ADR-009 reaching
+// the developer, and --force skipped the pre-flight one. An unreadable answer from
+// the daemon must not be the thing that silently drops it.
+func TestStopStillWarnsWhenTheShutdownAnswerCannotBeRead(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/status", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(runningStatus())
+	})
+	mux.HandleFunc("/shutdown", func(w http.ResponseWriter, r *http.Request) {
+		// Truncated: what a daemon that exits mid-write leaves on the wire.
+		fmt.Fprint(w, `{"shuttingDown":tr`)
+	})
+	srv := httptest.NewServer(mux)
+	t.Cleanup(srv.Close)
+	old := baseURL
+	baseURL = srv.URL
+	t.Cleanup(func() { baseURL = old })
+	var out, errOut strings.Builder
+
+	code := Stop(true, strings.NewReader(""), &out, &errOut)
+
+	if code != 0 {
+		t.Fatalf("want exit 0, got %d (stderr %q)", code, errOut.String())
+	}
+	if !strings.Contains(out.String(), "unsupervised") {
+		t.Errorf("an unreadable answer dropped the orphan warning; got %q", out.String())
 	}
 }

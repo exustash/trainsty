@@ -51,9 +51,17 @@ func Stop(force bool, stdin io.Reader, stdout, stderr io.Writer) int {
 	var payload struct {
 		JobWasActive bool `json:"jobWasActive"`
 	}
-	_ = json.NewDecoder(resp.Body).Decode(&payload)
+	// The daemon's answer is authoritative, but an unreadable one must not cost the
+	// developer the warning — a daemon that exits mid-write leaves a truncated body,
+	// and that is exactly when a suite was running. So the pre-flight status is the
+	// fallback: dropping the warning here would leave the ADR-009 hazard unstated in
+	// the one path (--force) that skipped the earlier one.
+	jobWasActive := snap.Job != nil
+	if err := json.NewDecoder(resp.Body).Decode(&payload); err == nil {
+		jobWasActive = payload.JobWasActive
+	}
 
-	if payload.JobWasActive {
+	if jobWasActive {
 		fmt.Fprintln(stdout, "trainsty: stopped — the suite that held the lock is still running, unsupervised")
 	} else {
 		fmt.Fprintln(stdout, "trainsty: stopped")
