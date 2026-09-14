@@ -7,6 +7,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"sync"
 	"syscall"
 	"time"
 
@@ -44,7 +45,8 @@ type Server struct {
 	http  *http.Server
 
 	// shutdown is closed by POST /shutdown to end Serve.
-	shutdown chan struct{}
+	shutdown     chan struct{}
+	shutdownOnce sync.Once
 }
 
 // New wires the routes. The scheduler and the logger are injected so tests can
@@ -61,7 +63,14 @@ func New(sched *scheduler.Scheduler, logger *log.Logger) *Server {
 	// Listen's bind classification probes it: without it, "already running" and
 	// "something else holds the port" cannot be told apart.
 	s.mux.HandleFunc("/status", guardReadOnly(s.handleStatus))
+	s.mux.HandleFunc("/register", guardReadOnly(s.handleRegister))
+	s.mux.HandleFunc("/release", guardMutating(s.handleRelease))
+	s.mux.HandleFunc("/shutdown", guardMutating(s.handleShutdown))
 	s.mux.HandleFunc("/", s.handleRoot)
+
+	// The liveness probe is started by the scheduler on every Grant, so it is
+	// owned by the Job rather than by the server.
+	sched.SetOnGrant(s.startProbe)
 
 	s.http = &http.Server{
 		Handler: s.mux,

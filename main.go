@@ -3,6 +3,9 @@ package main
 import (
 	"fmt"
 	"os"
+
+	"github.com/exustash/trainsty/daemonctl"
+	"github.com/exustash/trainsty/runner"
 )
 
 // Exit codes are part of the CLI contract, because scripts branch on them —
@@ -28,24 +31,52 @@ type command struct {
 
 // commands is the dispatch table and the source of help's output, so the two
 // cannot disagree. Order is the order help prints.
-var commands = []command{
-	{name: "wrap", summary: "run a command under the lock: trainsty wrap -- <command> [args...]", run: notImplemented("wrap")},
-	{name: "start", summary: "start the scheduler in the background", run: notImplemented("start")},
-	{name: "stop", summary: "stop the scheduler", run: notImplemented("stop")},
-	{name: "status", summary: "print what holds the lock and how many are waiting", run: notImplemented("status")},
-	{name: "ui", summary: "open the dashboard in a browser", run: notImplemented("ui")},
-	{name: "help", summary: "print this message", run: notImplemented("help")},
-	{name: "serve", summary: "run the scheduler in the foreground", hidden: true, run: notImplemented("serve")},
+//
+// Populated in init rather than as a literal: help renders this table, so a
+// literal would be a compile-time initialization cycle. Keeping one table and
+// breaking the cycle is better than keeping two lists that can drift.
+var commands []command
+
+func init() {
+	commands = []command{
+		{name: "wrap", summary: "run a command under the lock: trainsty wrap -- <command> [args...]", run: runWrap},
+		{name: "start", summary: "start the scheduler in the background", run: runStart},
+		{name: "stop", summary: "stop the scheduler (--force to skip the prompt)", run: runStop},
+		{name: "status", summary: "print what holds the lock and how many are waiting", run: runStatus},
+		{name: "ui", summary: "open the dashboard in a browser", run: runUI},
+		{name: "help", summary: "print this message", run: runHelp},
+		{name: "serve", summary: "run the scheduler in the foreground", hidden: true, run: runServe},
+	}
 }
 
-// notImplemented is the placeholder every subcommand starts as. It names the
-// task that fills it in, so a stub reached by accident says what is missing
-// rather than failing silently.
-func notImplemented(name string) func([]string) int {
-	return func([]string) int {
-		fmt.Fprintf(os.Stderr, "trainsty: %s is not implemented yet\n", name)
-		return exitFailure
+// runWrap strips a leading `--` so both `wrap -- cmd` and `wrap cmd` work. The
+// separator is what the documented form uses, and it is what lets a suite take
+// flags of its own without wrap trying to parse them.
+func runWrap(args []string) int {
+	if len(args) > 0 && args[0] == "--" {
+		args = args[1:]
 	}
+	return runner.Wrap(args, os.Stderr)
+}
+
+func runStart(args []string) int  { return daemonctl.Start(os.Stdout, os.Stderr) }
+func runServe(args []string) int  { return daemonctl.Serve(os.Stderr) }
+func runStatus(args []string) int { return daemonctl.Status(os.Stdout, os.Stderr) }
+func runUI(args []string) int     { return daemonctl.UI(os.Stdout, os.Stderr) }
+
+func runStop(args []string) int {
+	force := false
+	for _, a := range args {
+		if a == "--force" || a == "-f" {
+			force = true
+		}
+	}
+	return daemonctl.Stop(force, os.Stdin, os.Stdout, os.Stderr)
+}
+
+func runHelp(args []string) int {
+	usage(os.Stdout)
+	return exitOK
 }
 
 func main() {
@@ -82,4 +113,9 @@ func usage(w *os.File) {
 		}
 		fmt.Fprintf(w, "  %-8s %s\n", c.name, c.summary)
 	}
+	// Stated because it is a real limitation with a non-obvious cause: a suite in a
+	// background process group that reads the terminal receives SIGTTIN and stops.
+	// A queued batch run is not an interactive session (research.md → R2).
+	fmt.Fprint(w, "\nwrap is for batch suites. An interactive or watch-mode suite that reads\n")
+	fmt.Fprint(w, "the terminal will stop, because a queued run is not a foreground job.\n")
 }

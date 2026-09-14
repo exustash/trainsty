@@ -467,8 +467,20 @@ job_e2e() {
   fi
   # Serially, always: every acceptance case binds the same port. -p 1 is the
   # package-level bound; the cases themselves must not call t.Parallel().
-  ( cd "$REPO_ROOT" && info "go test -race -p 1 -run TestAcceptance ./..." \
-    && go test -race -p 1 -run TestAcceptance ./... )
+  #
+  # -tags e2e is REQUIRED, not merely a filter. Without it these tests also match
+  # `go test -race ./...` in the test job, which runs CONCURRENTLY with this one,
+  # and the two fight over port 45678. With the tag on the files but missing here,
+  # this job finds no tests and reports a FALSE GREEN — which is how it was found,
+  # and why the count below exists.
+  local count
+  count="$(cd "$REPO_ROOT" && go test -tags e2e -list 'TestAcceptance.*' . 2>/dev/null | grep -c '^TestAcceptance' || true)"
+  if [ "${count:-0}" -eq 0 ]; then
+    warn "no acceptance tests found — refusing to report a pass for an empty run"
+    return "$EXIT_UNRUN"
+  fi
+  info "go test -tags e2e -race -p 1 -run TestAcceptance .  ($count cases)"
+  ( cd "$REPO_ROOT" && go test -tags e2e -race -p 1 -run TestAcceptance . )
 }
 
 # ============================ run =============================================

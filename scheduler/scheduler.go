@@ -235,7 +235,7 @@ func (s *Scheduler) Withdraw(w *Waiter) (released bool) {
 	s.mu.Lock()
 	if s.job != nil && s.job.waiter == w {
 		s.mu.Unlock()
-		return s.Release(s.jobFor(w))
+		return s.Release(s.JobFor(w))
 	}
 	for i, q := range s.queue {
 		if q == w {
@@ -247,8 +247,8 @@ func (s *Scheduler) Withdraw(w *Waiter) (released bool) {
 	return false
 }
 
-// jobFor returns the Job granted from w, or nil.
-func (s *Scheduler) jobFor(w *Waiter) *Job {
+// JobFor returns the Job granted from w, or nil if w does not hold the Lock.
+func (s *Scheduler) JobFor(w *Waiter) *Job {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.job != nil && s.job.waiter == w {
