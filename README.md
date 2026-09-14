@@ -122,6 +122,7 @@ trainsty start     # spawn the daemon detached; binds 127.0.0.1:45678
 trainsty status    # the active job and the queue length
 trainsty ui        # open the dashboard in your browser
 trainsty stop      # shut the daemon down
+trainsty version   # version, commit, toolchain and platform
 trainsty help      # the commands, and what trainsty is for
 ```
 

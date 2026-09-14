@@ -44,6 +44,7 @@ func init() {
 		{name: "stop", summary: "stop the scheduler (--force to skip the prompt)", run: runStop},
 		{name: "status", summary: "print what holds the lock and how many are waiting", run: runStatus},
 		{name: "ui", summary: "open the dashboard in a browser", run: runUI},
+		{name: "version", summary: "print the version, commit and platform of this binary", run: runVersion},
 		{name: "help", summary: "print this message", run: runHelp},
 		{name: "serve", summary: "run the scheduler in the foreground", hidden: true, run: runServe},
 	}
@@ -83,6 +84,11 @@ func runUI(args []string) int     { return daemonctl.UI(os.Stdout, os.Stderr) }
 
 func runStop(args []string) int {
 	return daemonctl.Stop(hasForce(args), os.Stdin, os.Stdout, os.Stderr)
+}
+
+func runVersion(args []string) int {
+	fmt.Fprintln(os.Stdout, versionLine())
+	return exitOK
 }
 
 func runHelp(args []string) int {

@@ -38,8 +38,8 @@ func TestHelpListsEveryVisibleCommandAndHidesServe(t *testing.T) {
 			t.Errorf("command %q has no summary, so help would print a blank line", c.name)
 		}
 	}
-	if visible != 6 {
-		t.Fatalf("want 6 visible commands, got %d", visible)
+	if visible != 7 {
+		t.Fatalf("want 7 visible commands, got %d", visible)
 	}
 }
 

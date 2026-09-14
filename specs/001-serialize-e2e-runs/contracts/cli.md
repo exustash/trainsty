@@ -116,9 +116,22 @@ Opens `http://localhost:45678` — `open` on darwin, `xdg-open` on linux. If the
 fails, **print the URL** and exit `0`: the developer can click it, and a failed browser
 launch is not a failed command.
 
+## `trainsty version`
+
+Prints one line and exits `0`:
+
+```text
+trainsty v1.0.0 (a1b2c3d4e5f6, go1.27.1, darwin/arm64)
+```
+
+The version comes from `runtime/debug.ReadBuildInfo`, **never from `-ldflags`**: a
+binary installed with `go install …@v1.0.0` reports that version, one built from a
+checkout reports the commit, and neither needs the release step to remember
+anything (OD-4). A dirty tree is marked. Survives `-ldflags="-s -w"`.
+
 ## `trainsty help`
 
-Lists the six public subcommands and **one line saying what trainsty is for** — the
+Lists the seven public subcommands and **one line saying what trainsty is for** — the
 name gives nothing away, where the requirements note's `e2e-scheduler` did (ADR-010).
 Mentions the interactive-suite limitation. `serve` is **not** listed.
 

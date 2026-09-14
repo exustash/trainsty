@@ -323,7 +323,7 @@ Four rules over all five:
 
 ## The CLI
 
-Six subcommands, and one interactive prompt in the product:
+Seven subcommands, and one interactive prompt in the product:
 
 | Command | Does |
 | ------- | ---- |
@@ -332,6 +332,7 @@ Six subcommands, and one interactive prompt in the product:
 | `trainsty stop` | `POST /shutdown`. **Warns and confirms when a Job is active**, naming the repo — the suite keeps running and becomes invisible to the scheduler (ADR-009) |
 | `trainsty status` | Prints the active Job and the queue length |
 | `trainsty ui` | Opens `http://localhost:45678` in the default browser |
+| `trainsty version` | What this binary is, for a bug report: version, commit, toolchain, platform. Read from the build, never injected at release time |
 | `trainsty help` | The commands, and one line saying what trainsty is for |
 
 - **Exit codes are the contract**, because a Runner branches on them: `0` success,

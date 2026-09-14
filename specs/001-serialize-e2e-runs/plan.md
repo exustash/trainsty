@@ -136,7 +136,7 @@ specs/001-serialize-e2e-runs/
 ├── quickstart.md        # Phase 1 output — how to prove it works
 ├── contracts/
 │   ├── http-api.md      #   the five endpoints, exactly
-│   └── cli.md           #   the six subcommands, their output and exit codes
+│   └── cli.md           #   the seven subcommands, output and exit codes
 ├── checklists/
 │   └── requirements.md  # Spec quality checklist — 16/16
 └── tasks.md             # Phase 2 output (/speckit-tasks — NOT created here)
