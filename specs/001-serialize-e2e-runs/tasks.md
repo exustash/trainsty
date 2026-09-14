@@ -323,3 +323,40 @@ Ordered by severity. Each task names the requirement it traces to and the gap ty
   `go install golang.org/x/vuln/cmd/govulncheck@latest`.
 - **`OD-3` and `OD-4`** remain open decisions and block nothing. `OD-4` (distribution) is
   now the practical next question, since there is a binary worth installing.
+
+---
+
+## Phase 8: Convergence
+
+**Appended 2026-09-14 by a second `/speckit-converge` run.** The Phase 7 gaps are
+closed and **no requirement is unmet**: 42 FRs, 10 SCs, 27 acceptance scenarios and
+all five constitution principles were re-checked against the code, and the gate is
+green. Every finding below is **code hygiene against this repository's own rules** —
+an ignored error, a comment describing behaviour the code does not have, and two
+vestigial constructs. None changes observable behaviour except T070's narrow case.
+
+Ordered by severity; all four are LOW. Each names the source it traces to and the
+gap type.
+
+- [X] T069 Make `writeJSON` and `writeJSONError` honour their own contract in `httpapi/guard.go` — either log the `json.Encode` failure (every caller is a `*Server` method, so `s.logf` is in reach) or delete the no-op `if err != nil { return }` branch and the comment that claims "Log it and move on" — per Constitution → Error handling and `CLAUDE.md` → Error Handling (contradicts). The branch is currently indistinguishable from falling off the end of the function, and the comment asserts a log that does not happen, which `RULES.md` §6.6 → *Assert it or do not write it* forbids
+- [ ] T070 Handle the discarded `json.Decode` error on the `/shutdown` response in `daemonctl/stop.go:54`, or state the assumption on the line — per FR-014 (partial). A truncated body silently sets `JobWasActive` to false and downgrades "the suite that held the lock is still running, unsupervised" to plain "stopped". With `--force` there is no pre-flight warning either, so the ADR-009 orphan hazard goes unstated in exactly the path that skipped the prompt
+- [ ] T071 Remove the `waited` return value from `acquire` in `runner/wrap.go` and the `_ = waited` discard at line 88 — per Constitution → Simplicity review and `RULES.md` §1.5 (unrequested). No caller consumes it; the "waiting for the lock…" and "granted after" messages are printed inside `acquire` itself, so the value carries nothing and the discard reads as though a message were missing
+- [ ] T072 Collapse the duplicated return in `parseRegistration`'s `IsGroupLeader` error handling in `httpapi/register.go` — both the `errors.Is(err, syscall.ESRCH)` arm and its fallthrough return `codeNoSuchProcess` — per Constitution → Simplicity review (unrequested). The function's own comment explains why any error here is effectively `ESRCH` (`getpgid(2)` needs no permission), which is precisely why the branch cannot distinguish anything
+
+### Notes on what was deliberately NOT appended
+
+- **The other five `_ =` sites** — `daemonctl/start.go:72` (`Process.Release`),
+  `runner/wrap.go:236` (the forwarded `Kill`), `httpapi/server.go:150-151`
+  (`Shutdown`/`Close`) and `dashboard/embed.go:26` (`Write`) — each carries a comment
+  naming why the error cannot be acted on. They are the documented exceptions, not
+  findings.
+- **`logpath/` sits at 64.3%**, not higher, because the Linux `XDG_STATE_HOME` branch
+  cannot execute on Darwin. T068 covered the error paths it asked for; the remainder is
+  a platform artefact, not a gap.
+- **`daemonctl/` (36.6%) and `runner/` (37.1%)** stay low by design: `Start`, `Serve`
+  and `Wrap` spawn processes and bind the real port, so they are proven by the
+  acceptance suite. Their branching logic is unit-tested after T059/T065/T066.
+- **`govulncheck` still reports "did not run"** — not installed, and part of
+  `scripts/ci-local.sh` rather than this feature's spec, so out of convergence scope.
+  `go install golang.org/x/vuln/cmd/govulncheck@latest`.
+- **`OD-3` and `OD-4`** remain open and block nothing.

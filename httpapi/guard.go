@@ -30,20 +30,23 @@ const (
 //
 // It writes a code and nothing else: never an internal error string, a filesystem
 // path, or an errno text. The detail belongs in the log.
+// The encode error is discarded deliberately, here and in writeJSON. Every value
+// either function writes is primitives or a Snapshot of them, so marshalling cannot
+// fail: the only way to get an error is a client that has already gone. The status
+// line is sent, so there is nothing left to tell it — and nothing a log line would
+// tell a developer either, because every outcome worth recording is logged by the
+// handler that caused it. A dashboard tab closed mid-poll is not an event.
 func writeJSONError(w http.ResponseWriter, status int, code string) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(map[string]string{"error": code})
 }
 
-// writeJSON writes a success payload.
+// writeJSON writes a success payload. Its encode error is discarded for the reason
+// given above writeJSONError.
 func writeJSON(w http.ResponseWriter, v any) {
 	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(v); err != nil {
-		// The status line is already sent, so there is nothing to report to the
-		// client. Log it and move on rather than pretending it succeeded.
-		return
-	}
+	_ = json.NewEncoder(w).Encode(v)
 }
 
 // guardMutating wraps a handler that changes state. It enforces the whole of the
