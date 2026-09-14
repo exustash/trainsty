@@ -3,6 +3,14 @@
 /trainsty
 /dist/
 
+# `go mod vendor` output. Nothing should ever produce it — go.mod declares no
+# dependencies (Principle I, and scripts/ci-local.sh enforces it) — so a vendor/
+# directory appearing is a signal, not a thing to commit.
+/vendor/
+
+# Deliberately NOT ignoring *.exe: this project is Unix-only (ADR-002), and a
+# pattern for a Windows artifact would imply a target that does not exist.
+
 # Go test and coverage artefacts
 *.test
 *.out

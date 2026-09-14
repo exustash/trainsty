@@ -40,10 +40,10 @@ the acceptance suite is `e2e_test.go` at the root.
 **Purpose**: Make the repository a buildable Go module with a dispatch skeleton, so
 every later task has somewhere to land and the gates can run.
 
-- [ ] T001 Create `go.mod` at repository root: module `github.com/exustash/trainsty`, `go 1.20`, and **no `require` block** — the floor is set by `http.NewResponseController` (research R1) and zero dependencies is Principle I
-- [ ] T002 Create `main.go` with subcommand dispatch only — `wrap`, `start`, `stop`, `status`, `ui`, `help`, plus hidden `serve` — each returning a "not implemented" stub and exit code 1; no logic in this file, ever
-- [ ] T003 [P] Verify the four gates run clean on the skeleton: `gofmt -l .` silent, `go vet ./...`, `go build ./...`, `go test -race ./...`. Record the commands in the commit body — they are the merge gate (`RULES.md` §3.3)
-- [ ] T004 [P] Add `doc.go` at repository root with a package comment naming what trainsty is and pointing at `knowledge/index.md`
+- [X] T001 Create `go.mod` at repository root: module `github.com/exustash/trainsty`, `go 1.20`, and **no `require` block** — the floor is set by `http.NewResponseController` (research R1) and zero dependencies is Principle I
+- [X] T002 Create `main.go` with subcommand dispatch only — `wrap`, `start`, `stop`, `status`, `ui`, `help`, plus hidden `serve` — each returning a "not implemented" stub and exit code 1; no logic in this file, ever
+- [X] T003 [P] Verify the four gates run clean on the skeleton: `gofmt -l .` silent, `go vet ./...`, `go build ./...`, `go test -race ./...`. Record the commands in the commit body — they are the merge gate (`RULES.md` §3.3)
+- [X] T004 [P] Add `doc.go` at repository root with a package comment naming what trainsty is and pointing at `knowledge/index.md`
 
 **Checkpoint**: `go build` produces a binary that prints help-ish stubs for six commands.
 
