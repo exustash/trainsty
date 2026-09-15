@@ -1,3 +1,8 @@
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/logo-dark.png">
+  <img src="assets/logo.png" alt="" width="84" align="right">
+</picture>
+
 # trainsty
 
 A **local E2E test scheduler** built by Cilantro Lab: a single-binary Unix daemon

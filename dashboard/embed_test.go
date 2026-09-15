@@ -43,7 +43,10 @@ func TestPageNeverUsesInnerHTML(t *testing.T) {
 // The daemon must work with no network at all: developers run local CI on planes,
 // and a page that silently loses its layout offline is worse than a plain one.
 func TestPageLoadsNothingRemote(t *testing.T) {
-	src := string(Page())
+	// The SVG namespace is an identifier the browser never fetches, and the
+	// inline logo and the favicon both carry it. Same false positive the
+	// innerHTML guard above records: strip it, then scan for the rest.
+	src := strings.ReplaceAll(string(Page()), "http://www.w3.org/2000/svg", "")
 	for _, banned := range []string{"http://", "https://", "//cdn", "integrity="} {
 		if strings.Contains(src, banned) {
 			t.Errorf("the dashboard references %q — it must load nothing remote", banned)
