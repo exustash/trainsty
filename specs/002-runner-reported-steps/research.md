@@ -103,8 +103,8 @@ reviewed as such (`RULES.md` §5.1).
   - No answer within the named constant `stepTimeout = 1 * time.Second`, or a
     refusal → one stderr line: `trainsty: step "<name>" not recorded (<reason>)`.
 - **Rationale:** a progress label is never a result a script branches on, and a
-  `set -e` script must survive it (SC-012). A 1 s timeout bounds the worst case
-  (SC-014).
+  `set -e` script must survive it (SC-013). A 1 s timeout bounds the worst case
+  (SC-015).
 - **Usage error:** a missing argument is a script-author bug, so it also prints one
   line and exits 0. Failing would break CI over a label.
 

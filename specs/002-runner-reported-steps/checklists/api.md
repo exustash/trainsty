@@ -24,7 +24,7 @@
 
 ## Requirement Consistency
 
-- [x] CHK011 - Are FR-049's "give up within 1 second" and SC-014's "under 1 second in the worst case" consistent, given that SC-014 counts per run while FR-049 is per announcement (N announcements against a hanging scheduler could add N seconds)? [Conflict, Spec §FR-049, §SC-014]
+- [x] CHK011 - Are FR-049's "give up within 1 second" and SC-015's "under 1 second in the worst case" consistent, given that SC-015 counts per run while FR-049 is per announcement (N announcements against a hanging scheduler could add N seconds)? [Conflict, Spec §FR-049, §SC-015]
 - [x] CHK012 - Is the always-exit-0 rule (FR-049) reconciled in writing with `CLAUDE.md`'s "exit codes are the contract", so the exception does not read as a defect? [Consistency, Spec §FR-049]
 - [x] CHK013 - Is the pid-matching rule (FR-041: exact match, no fallback) stated consistently with `/release`'s, which allows a pid-less "whatever holds the Lock" form, with the difference justified? [Consistency, Spec §FR-041]
 - [x] CHK014 - Is the Step term in the spec consistent with the glossary, which does not yet define it, including the "job" naming clash with `ci-local.sh`? [Consistency, Spec §Key Entities]
@@ -45,9 +45,9 @@
 
 ## Acceptance Criteria Quality
 
-- [x] CHK023 - Is SC-010's "within one refresh (about 2 seconds)" stated as a bound a test can assert, such as one poll interval plus a stated margin? [Measurability, Spec §SC-010]
-- [x] CHK024 - Is SC-014's "imperceptible normally" quantified? [Measurability, Spec §SC-014]
-- [x] CHK025 - Can SC-013 ("never shown on another run's row") be checked against named scenarios, such as stale pid, Waiter pid and post-Shutdown? [Measurability, Spec §SC-013]
+- [x] CHK023 - Is SC-011's "within one refresh (about 2 seconds)" stated as a bound a test can assert, such as one poll interval plus a stated margin? [Measurability, Spec §SC-011]
+- [x] CHK024 - Is SC-015's "imperceptible normally" quantified? [Measurability, Spec §SC-015]
+- [x] CHK025 - Can SC-014 ("never shown on another run's row") be checked against named scenarios, such as stale pid, Waiter pid and post-Shutdown? [Measurability, Spec §SC-014]
 
 ## Dependencies & Assumptions
 
