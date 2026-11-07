@@ -39,6 +39,22 @@ Three behaviours to know rather than discover:
 | The suite fails | `wrap` exits with the suite's status. A red suite stays red |
 | `Ctrl+C` | The Lock is released and nothing the suite started survives, with no cleanup written by anyone |
 
+**To have the script start the Daemon if it is not running**, put one line before
+the wrapped command:
+
+```bash
+trainsty status >/dev/null 2>&1 || trainsty start || true
+trainsty wrap -- npm run test:e2e
+```
+
+`trainsty status` exits non-zero when no Daemon is reachable, and only then is
+`start` run. `|| true` is there because two scripts starting at the same moment is
+harmless — the port bind lets one Daemon win (ADR-011) — but the losing `start`
+can exit 1 with *already running*, which would abort a `set -e` script. If the start
+genuinely fails, its error stays on stderr and `wrap` still runs the suite and says
+it is not serialized. This is §6's *Start the daemon*, chosen per repository;
+**ADR-014** (proposed) would make `wrap` do it itself.
+
 **Verify once per repository**, with the suite running: open the Dashboard, press
 Stop, then check for survivors —
 `pgrep -f 'chrome|chromium|firefox|playwright' | head`. Anything left is a defect in
