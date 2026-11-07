@@ -163,6 +163,9 @@ Procedures, not rules — deliberately not auto-loaded.
   port a real daemon holds, which is trainsty's own contention problem inside its own
   test suite. §7 lists the four bugs the gate found in itself on its first run, three
   of which were the same mistake.
+- [Running trainsty with Podman](playbooks/podman.md) — building the container
+  image, running the scheduler in a Podman Pod with shared PID and network
+  namespaces, and wrapping containerized test suites on macOS and Linux.
 
 ### Product
 
