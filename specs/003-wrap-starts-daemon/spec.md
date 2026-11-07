@@ -15,8 +15,8 @@ today's run-anyway behaviour. No API change, no flag."
 **Amends**: `specs/001-serialize-e2e-runs/spec.md` → **FR-038**.
 
 > Requirements continue the repository's sequence: 001 ends at FR-039 and
-> SC-010; 002 (Runner-reported Steps) holds FR-040–FR-051 and
-> SC-011–SC-015. This feature starts at FR-052 and SC-016.
+> SC-010; 002 (Runner-reported Steps) holds FR-040–FR-052 and
+> SC-011–SC-015. This feature starts at FR-053 and SC-016.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -130,27 +130,27 @@ said once why the run is not serialized.
 
 ### Functional Requirements
 
-- **FR-052**: When no Daemon is reachable, `trainsty wrap` MUST start one —
+- **FR-053**: When no Daemon is reachable, `trainsty wrap` MUST start one —
   detached, outliving `wrap`, and logging where `trainsty start` would log —
   and then register with it as usual.
-- **FR-053**: When `wrap` starts a Daemon, it MUST say so once, naming where the
+- **FR-054**: When `wrap` starts a Daemon, it MUST say so once, naming where the
   Daemon logs. When a Daemon was already running, `wrap` MUST add no output.
-- **FR-054**: Concurrent `wrap`s that each find no Daemon MUST end with exactly
+- **FR-055**: Concurrent `wrap`s that each find no Daemon MUST end with exactly
   one Daemon running and every one of them registered with it. Losing the race
   to start the Daemon MUST NOT be reported as a failure or as an unserialized
   run.
-- **FR-055**: The start attempt MUST be bounded in time. If no Daemon is
+- **FR-056**: The start attempt MUST be bounded in time. If no Daemon is
   reachable once the bound passes, `wrap` MUST fall back to FR-038's behaviour.
-- **FR-056**: If the Daemon cannot be started, `wrap` MUST run the suite anyway
+- **FR-057**: If the Daemon cannot be started, `wrap` MUST run the suite anyway
   and MUST say, once, that the run is not serialized **and why** —
   distinguishing a port held by another program (naming the command that shows
   the holder) from any other failure (pointing at the log where one exists).
-- **FR-057**: `wrap` MUST pass the suite's output through untouched and exit
+- **FR-058**: `wrap` MUST pass the suite's output through untouched and exit
   with the suite's own status on every path this feature adds, as FR-037
   requires today.
-- **FR-058**: This feature MUST NOT change the Daemon, the HTTP API, or the
+- **FR-059**: This feature MUST NOT change the Daemon, the HTTP API, or the
   CLI surface: no new endpoint, parameter, flag, subcommand, or configuration.
-- **FR-059**: `trainsty stop` MUST tell the Developer that the next wrapped run
+- **FR-060**: `trainsty stop` MUST tell the Developer that the next wrapped run
   will start the Daemon again.
 
 **FR-038 is amended, not removed**: "when the scheduler is unreachable" now
