@@ -1,148 +1,132 @@
-# Plan: Runner-reported Steps on the Dashboard
+# Implementation Plan: Runner-reported Steps on the Dashboard
 
-**Status:** deferred, 2026-11-04. Not started. Pick up when `teneerai.web` is idle
-(see *Before starting*).
+**Branch**: `docs/runner-reported-steps-spec` (feature directory `002-runner-reported-steps`) | **Date**: 2026-11-05 | **Spec**: [spec.md](spec.md)
 
-## Goal
+**Input**: Feature specification from `specs/002-runner-reported-steps/spec.md`
 
-The Dashboard's Job row shows **the Steps running now** (name and elapsed time for
-each), like a CI provider's step list but with **no history**: a Step disappears when
-it ends. Today the row shows only repo, pid and elapsed time:
+**Note**: This replaces the pre-spec sketch committed in `a3f9ee7`. Its findings
+and client-side changes are carried into [research.md](research.md).
+
+## Summary
+
+The Runner announces the start and end of each named Step. The Daemon keeps the
+Job's running Steps (at most 16) and reports them in `/status`, and the Dashboard
+shows each one with its own elapsed time. Steps live on the Job, so all five
+release paths clear them with no change to any path. Announcements are matched to
+the Job by exact pid, so a stale run cannot label its successor. The shipped Runner
+passes its pid to the suite as `TRAINSTY_PID`, and a new `trainsty step` command
+reads it and always exits 0, so a progress label can never fail CI.
+
+## Technical Context
+
+**Language/Version**: Go, the floor set by `go.mod` (1.20; `ResponseController`)
+
+**Primary Dependencies**: standard library only (`net/http`, `encoding/json`, `embed`)
+
+**Storage**: none. In memory, behind the one mutex (DDR-001)
+
+**Testing**: `testing` and `httptest`, `go test -race ./...`, and the acceptance suite via `scripts/ci-local.sh --everything`
+
+**Target Platform**: Linux and macOS (ADR-002)
+
+**Project Type**: single static binary: Daemon, CLI and embedded Dashboard
+
+**Performance Goals**: each announcement adds at most 1 s with no Daemon answering, and at most 100 ms against a responsive one (SC-014)
+
+**Constraints**: no new dependency, mutex, persistence, configuration or push channel; the Daemon never reads the Runner's output (FR-050)
+
+**Scale/Scope**: ≤16 running Steps per Job, names ≤128 bytes, so at most ~2 KB of new state. One endpoint, one subcommand, one Dashboard column
+
+## Constitution Check
+
+*GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
+
+| Principle / constraint | Verdict | Why |
+| --- | --- | --- |
+| I. Single binary, stdlib first | ✅ | No new import beyond what `httpapi/` and `daemonctl/` already use |
+| II. The Daemon is a traffic light | ✅ | Steps are announced, never inferred from output (R1). The Daemon spawns, captures and reformats nothing; `wrap` only gains an environment variable |
+| III. Every Lock has a guaranteed release | ✅ | No path acquires or holds the Lock. Steps are owned by the Job, so every release path clears them; no release path changes |
+| IV. Unix-only, process-group discipline | ✅ | No syscall. `/step` compares a pid and signals nothing (R3) |
+| V. One state, one mutex, one truth | ✅ | Steps sit on the Job under `s.mu`; `/status` reports them verbatim; the Dashboard derives them from the latest poll; nothing is persisted |
+| API surface is the complete contract | ⚠️ **amendment** | `POST /step` is new: **MINOR, 1.0.0 → 1.1.0**, carried in the same change. Not a violation, but the gate requires it |
+| Timings are named constants | ✅ | `stepTimeout` in `daemonctl/` |
+| Footprint: no unbounded buffer | ✅ | 16-Step cap and 128-byte names (FR-043, FR-044) |
+| Inputs validated before use | ✅ | `pid`, `state` and `name` validated in `httpapi/` before the scheduler is called (R5) |
+| Simplicity review | ✅ | No interface, no knob: the cap is a constant, not configuration |
+
+**Post-design re-check (after Phase 1):** unchanged, all ✅ plus the MINOR
+amendment. The design added nothing the table above did not anticipate.
+
+## Project Structure
+
+### Documentation (this feature)
 
 ```text
-Holding the lock
-Repository             Process    Running now                  Elapsed
-teneerai.web-dbchecks  pid 96032  Unit tests (coverage) 4m12s  6m03s   Stop
-                                  Scanners: osv          12s
+specs/002-runner-reported-steps/
+├── spec.md
+├── plan.md               # this file
+├── research.md           # R1–R10, including the client changes
+├── data-model.md         # Step, Job, Snapshot
+├── quickstart.md         # seven validation scenarios
+├── contracts/
+│   ├── http-api.md       # POST /step, and the /status change
+│   └── cli.md            # trainsty step, and wrap's TRAINSTY_PID
+├── checklists/requirements.md
+└── tasks.md              # /speckit-tasks — not created here
 ```
 
-## Why the Runner must report Steps
+### Source Code (repository root)
 
-The Daemon never sees test output (ADR-003), and `wrap` hands the suite the
-terminal directly (FR-037). Parsing output for step markers would need a pipe, which
-turns off colour and TTY-aware reporters. So the Runner **announces** each Step's
-start and end; nothing is inferred.
+```text
+scheduler/
+├── scheduler.go          # Step type, Job.steps, StartStep/EndStep, ErrTooManySteps, JobView.Steps
+└── scheduler_test.go     # identity, cap, restart, Release clears, clock
+httpapi/
+├── step.go               # new: handleStep, validation, refusal logging
+├── step_test.go          # new: guard, codes, no-ops, logging
+├── guard.go              # three new error codes
+├── server.go             # route /step behind guardMutating
+└── status_test.go        # steps [] and populated
+runner/
+├── wrap.go               # acquire reports granted; set TRAINSTY_PID
+└── wrap_test.go          # child sees it only when granted
+daemonctl/
+├── step.go               # new: Step client, stepTimeout, always exit 0
+└── step_test.go          # new: silent, posts pid, not-recorded line
+main.go                   # "step" in the commands table
+dashboard/
+├── index.html            # "Running now" column
+└── embed_test.go         # the column uses textContent and a list
+```
 
-## Findings that shape the design
+**Structure Decision**: the existing package layout, unchanged. The scheduling
+rule (identity and cap) is pure and lives in `scheduler/`; the wire format and
+validation in `httpapi/`; the client in `daemonctl/`, which keeps `os/exec` out of
+the new command.
 
-- **`teneerai.web`** wraps its whole CI: `trainsty wrap -- scripts/ci-local.sh`.
-  Jobs run **in parallel by default** (`dispatch_parallel`; `--sequential` turns it
-  off), so several Steps can be running at once. The CI job also runs its own
-  sequence inside it: lint, typecheck, test:coverage, coverage ratchet, build.
-- **`teneerai.desk`** wraps only `npm run test:e2e`, so its build and lint run
-  outside the Lock. Steps inside its Lock would come from WebdriverIO hooks. Out of
-  scope here.
-- **Naming clash:** `ci-local.sh` calls its units "jobs". In trainsty's vocabulary
-  they are **Steps**, and the **Job** is the whole locked run. The glossary entry
-  must say so.
+## Documentation carried in the same change
 
-## Decisions (defaults, confirm when picking up)
-
-1. Show **every running Step**, not one "current step", because jobs run in
-   parallel.
-2. `teneerai.web` reports at the **job level**. Marking the CI job's internal
-   sequence is optional and comes after.
-3. trainsty ships first (tagged release); the `teneerai.web` script change follows
-   as a separate commit in that repository.
-
-## Design
-
-| Area | Change |
+| File | Change |
 | --- | --- |
-| `scheduler/` | `Job` keeps its running Steps: name → start time, **capped at 16** (no unbounded buffer). New methods `StartStep(pid, name)` and `EndStep(pid, name)` act only when `pid == job.PID`, so a late call from a finished run cannot label its successor. Release drops the Job and its Steps with it. Starting a name already running restarts its timer. |
-| `httpapi/` | `POST /step?pid=N&name=…&state=start\|end` behind `guardMutating`. `pid` **required**, with no "whatever holds the Lock" fallback. `name` validated like `repo` (≤128 chars, no control characters). Stale or unknown pid, or ending a Step that is not running: `200 {"recorded":false}`. Bad input: `400` with a stable code (`invalid_step_name`, `invalid_step_state`, `too_many_steps`). |
-| `/status` | `job.steps: [{name, startedAt, elapsedSeconds}]`, oldest first, never `null`. Additive, so existing clients keep working. |
-| `runner/wrap.go` | After the Grant, run the suite with `TRAINSTY_PID=<wrap's pid>` added to its environment. Do **not** set it on the unserialized paths (no daemon, refused, lost stream), which makes reporting a no-op there. |
-| CLI | New `trainsty step start\|end <name>`: reads `TRAINSTY_PID` and POSTs with a 1 s timeout. Always exits `0` (clarified 2026-11-05). Without `TRAINSTY_PID` it is silent. When not recorded (no daemon, refused) it prints one line on stderr. |
-| `dashboard/index.html` | A "Running now" cell on the Job row: one line per Step with its own ticking elapsed time. `textContent` only. |
-| `trainsty status` | Optional: print the running Steps. |
+| `knowledge/domains/ubiquitous-language.md` | **First:** the Step term. Banned names: stage, phase, task, job |
+| `.specify/memory/constitution.md` | MINOR 1.1.0: `POST /step` in the API surface; version line; Sync Impact Report |
+| `knowledge/conventions/api.md` | Endpoint table and a `/step` section |
+| `knowledge/architecture/adr.md` | ADR-014: the Runner announces Steps (R1's rejected alternatives) |
+| `knowledge/data/state.md`, `knowledge/data/ddr.md` | Steps held in memory; DDR-003 records that nothing new is written |
+| `knowledge/security/sdr.md` | SDR-001 note: `/step` changes only a label, so the no-token reasoning holds |
+| `knowledge/product/decisions.md` | Register rows for FR-040–FR-052, **after** the vault note gains the requirement |
+| `CLAUDE.md` | CLI table: eight subcommands, with `step`'s always-0 exception |
+| `README.md` | "Reporting Steps", with the `curl` form for hand-written Runners |
 
-Mutex discipline: Step updates are a map write under the one mutex; no channel send,
-syscall or flush while holding it.
+## Sequencing and the busy-machine constraint
 
-## Tasks (trainsty)
+- **Any time:** tasks, code and unit and `httpapi/` tests; all docs.
+- **Needs no active Job on the machine:** the acceptance suite (it binds 45678),
+  installing the new binary, restarting the Daemon (ADR-009), and the quickstart.
+- **After a release (a `RULES.md` §1.3 approval step):** the `teneerai.web`
+  `ci-local.sh` change (research R10), made while no run of it is active.
 
-Tests come before each fix or feature and are watched failing first (`RULES.md` §3.1).
+## Complexity Tracking
 
-1. **Glossary first:** add **Step** to `knowledge/domains/ubiquitous-language.md`.
-   Banned names: stage, phase, task, and job (the ci-local word).
-2. `scheduler/`: `StartStep` / `EndStep` and the Snapshot field. Table-driven tests:
-   - records a Step for the Job's pid;
-   - ignores a Waiter's pid, an unknown pid, and a stale pid after the Lock passes
-     to a successor;
-   - `EndStep` removes; ending an unknown name is a no-op;
-   - the cap refuses the 17th Step;
-   - Release clears the Steps;
-   - elapsed time comes from the injected clock.
-   Keep `scheduler/` coverage ≥80%.
-3. `httpapi/`: the `/step` handler. Tests:
-   - `GET` → 405; missing JSON content type → refused; foreign `Origin` → 403;
-   - missing pid, bad name and bad state → 400 with their codes;
-   - a no-op returns 200;
-   - `/status` shows `steps` as `[]` and populated.
-4. `runner/`: export `TRAINSTY_PID` only when granted. Test: the child sees it when
-   granted, and does not see it with no daemon reachable.
-5. CLI `step` subcommand in `main.go` dispatch (logic in `daemonctl/` or `runner/`)
-   and a `help` line. Tests: no-op without `TRAINSTY_PID`; posts with the right pid;
-   exit code with no daemon.
-6. Dashboard cell and ticking per-step elapsed time. Extend `dashboard/embed_test.go`
-   if it asserts on markup.
-7. Acceptance (`--everything`): `wrap` a script that starts and ends two Steps;
-   assert `/status` shows them while running and drops them at the end.
-
-## Docs in the same change
-
-- `.specify/memory/constitution.md`: **MINOR amendment 1.0.0 → 1.1.0** (new
-  endpoint), version line and Sync Impact Report.
-- `knowledge/conventions/api.md`: endpoint table and a `/step` section.
-- `CLAUDE.md`: the CLI table goes from seven to eight subcommands.
-- `knowledge/data/state.md` and a new **DDR**: the Daemon now holds Step labels, in
-  memory only, and still writes nothing.
-- `knowledge/architecture/adr.md`: **ADR-014**, the Runner reports Steps. Rejected
-  alternatives: parsing output (breaks the TTY, ADR-003); pushing to the Dashboard
-  (ADR-005); a step file the Daemon reads (DDR-001/002); a Step history (more state,
-  not asked for).
-- `knowledge/security/sdr.md`: a note under SDR-001 that `/step` only stores a
-  label. The worst a same-user process can do is mislabel, so the no-token
-  reasoning holds.
-- `knowledge/product/decisions.md`: register row. The requirements note does not
-  mention Steps; **add the requirement to the Obsidian vault first**, then re-copy
-  the mirror.
-- `README.md`: a short "Reporting Steps" section with the `curl` form for
-  hand-written Runners.
-
-## Client change (`teneerai.web/scripts/ci-local.sh`, after the trainsty release)
-
-```bash
-trainsty_step() { # start|end label — a no-op outside `trainsty wrap`
-  [ -n "${TRAINSTY_PID:-}" ] || return 0
-  trainsty step "$1" "$2" 2>/dev/null || true   # a progress label never fails CI
-}
-```
-
-- `dispatch_serial`: `trainsty_step start "${JOB_LABEL[$i]}"` before
-  `"${JOB_FUNC[$i]}"` and `trainsty_step end …` after, keeping `$?` for
-  `record_result`.
-- `dispatch_parallel`: the same, inside the `( … ) &` subshell.
-- Optional: mark the CI job's internal sequence (`info "npm run typecheck" && …`)
-  with a helper that starts and ends around each command.
-- Compatibility: on an older Daemon, `/step` is a 404 that the helper ignores. The
-  `teneerai.web-dbchecks` clone needs the same change, or a rebase onto it.
-
-Hand-written Runner equivalent:
-
-```bash
-curl -X POST -H 'Content-Type: application/json' \
-  "http://127.0.0.1:45678/step?pid=$$&name=Build&state=start"
-```
-
-## Before starting
-
-- [ ] `trainsty status` shows no `teneerai.web*` Job running.
-- [ ] Decisions 1–3 confirmed.
-- [ ] Requirement added to the vault note.
-- [ ] Gates green: `scripts/ci-local.sh --everything`. The acceptance suite binds
-      port 45678, so it needs the real Daemon stopped (`trainsty stop`) with no
-      Job active.
-- [ ] Afterwards: cut a release (an RULES.md §1.3 approval step), then change the
-      client scripts.
+No violations. The one item the gate flags is the constitution's own amendment
+procedure for a new endpoint, not a deviation from a principle.

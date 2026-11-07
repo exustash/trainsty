@@ -33,6 +33,10 @@ history.
   (FR-049).
 - Q: Does the Daemon log Step announcements? → A: Only refused ones, with the
   reason. Accepted and stale announcements are not logged (FR-051).
+- Q: The requirements review (`checklists/api.md`, 27 items) found two conflicts
+  and several gaps. → A: Resolved in this spec: names are limited in bytes; the
+  1-second bound is per announcement; restarts are allowed at the cap; Steps
+  survive a re-registration; `TRAINSTY_PID` is contract; FR-052 was added.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -135,11 +139,21 @@ same as without the announcements.
   The Step stays on display until the Job ends, then disappears with it. Its
   ticking time is what makes this visible.
 - **An end announced for a Step that is not running.** Ignored, and not an error.
-- **Too many Steps at once.** Beyond the cap (16 running at once), further starts
-  are refused. Steps already on display are kept.
+- **Too many Steps at once.** Beyond the cap (16 running at once), starting a
+  **new** name is refused. Steps already on display are kept. Restarting a name
+  that is already running is allowed at the cap, because it adds nothing.
 - **A hostile or broken Step name.** Over-long names, or names containing control
   characters or newlines, are refused. Markup in a name is displayed as literal
   text and never interpreted.
+- **Names that differ only in whitespace.** Names are compared byte for byte, with
+  no trimming, so `Lint` and `Lint ` are two different Steps.
+- **The same Runner re-registers** (ADR-007: a re-registration by the Job's own pid
+  is granted at once). The Job is unchanged, so its running Steps are kept.
+- **A suite still running after a Shutdown** (ADR-009) announces Steps to a later
+  Daemon. That Daemon has no Job for its pid, so every announcement is a no-op.
+- **An announcement during a Lock hand-over** attaches to the Job that holds the
+  Lock at that instant, or to none. It never attaches to both, and never to the
+  wrong one.
 - **A cross-site page tries to announce a Step.** Refused, the same way every other
   state-changing request is refused (SDR-001's floor).
 - **Steps announced while waiting.** A Runner still in the Queue holds no Job, so
@@ -153,41 +167,60 @@ same as without the announcements.
   Step of the Job it is running.
 - **FR-041**: An announcement MUST identify the Runner by the same process
   identifier it registered with. One whose identifier is not the current Job's
-  MUST be ignored and MUST NOT affect any Job. There is no "whichever Job holds the
-  Lock" form.
-- **FR-042**: An announcement that changes nothing (stale identifier, ending an
-  unknown Step, no Job) MUST be answered as a success, not an error, so a Runner's
-  normal path prints no failure.
+  MUST be ignored and MUST NOT affect any Job. The match and the change MUST happen
+  as one step with respect to a Lock hand-over, so an announcement reaches exactly
+  one Job or none. There is no "whichever Job holds the Lock" form: `/release` has
+  one only for hand-written Runners written before identity checks existed, and an
+  endpoint that is new has no such clients to honour.
+- **FR-042**: An announcement that changes nothing MUST be answered as a success,
+  not an error, so a Runner's normal path prints no failure. That covers a stale
+  identifier, no Job, and ending a name that is not running. All of these get the
+  same "not recorded" answer.
 - **FR-043**: Step names MUST be validated before they are kept: non-empty, at most
-  128 characters, no control characters. Invalid ones are refused with a stable,
-  machine-readable reason.
+  128 **bytes**, and free of control characters under the same rule as `repo`
+  (U+0000–U+001F and U+007F). Names are kept and compared exactly, with no
+  trimming. An invalid request is refused with a stable, machine-readable reason.
+  When several parameters are invalid, the reported reason follows a fixed order:
+  identifier, then state, then name. The codes are listed in
+  [contracts/http-api.md](contracts/http-api.md); adding one is a contract change.
 - **FR-044**: The scheduler MUST keep only the Steps running now, with each one's
-  name and start time, at most 16 per Job. It keeps no history of ended Steps, and
-  a Step's information is gone when its Job is.
+  name and start time, at most 16 per Job. A new name beyond 16 is refused;
+  restarting a running name is not. It keeps no history of ended Steps. A Job's
+  Steps survive a re-registration by its own pid, and end when the Job ends by any
+  of the five release paths: the Runner's release, a dropped Registration, the
+  Liveness Probe, a Stop, or a Shutdown.
 - **FR-045**: The status report MUST include the Job's running Steps, oldest
   first, each with its name, start time and elapsed seconds. It MUST report an
-  empty list (never an absent one) when there are none.
+  empty list (never an absent one) when there are none. The change is additive:
+  no existing field is renamed, retyped or removed.
 - **FR-046**: The Dashboard MUST show each running Step on the Job's row with its
   own advancing elapsed time, and MUST show nothing extra when there are none.
 - **FR-047**: Step announcements MUST get the same protection as every other
   state-changing request: one sent by a web page in the Developer's browser is
   refused (SDR-001's floor).
 - **FR-048**: The shipped Runner MUST make its registered process identifier
-  available to the command it runs, and only once the Lock is granted, so a script
-  can announce Steps with no configuration.
+  available to the command it runs, as the environment variable `TRAINSTY_PID`, and
+  only once the Lock is granted, so a script can announce Steps with no
+  configuration. The variable's name and meaning are part of the compatibility
+  surface: changing either is a breaking change.
 - **FR-049**: The product MUST provide a command a script can call to announce a
   Step. It MUST always exit with status 0, so a script that aborts on the first
   failure is never stopped by it. It MUST do nothing, silently, when not running
   under a granted Runner. When the scheduler does not answer within 1 second, or
-  refuses the announcement, it MUST print one line on stderr saying the Step was
-  not recorded. This is a deliberate exception to the CLI's exit-code contract: a
-  progress label is not a result a script branches on.
+  refuses the announcement, or `TRAINSTY_PID` is set but is not a positive integer,
+  it MUST print one line on stderr saying the Step was not recorded. That line is
+  for people; its wording is not a contract. This is a deliberate exception to the
+  CLI's exit-code contract: a progress label is not a result a script branches on.
+  `CLAUDE.md`'s CLI rules MUST record the exception.
 - **FR-050**: The scheduler MUST NOT read, capture or parse the Runner's output to
   learn about Steps. Steps come only from announcements (ADR-003).
-- **FR-051**: The Daemon MUST log each **refused** announcement (invalid name,
-  invalid state, Step cap reached) with the reason and the identifier it carried.
-  A refused name is untrusted, so it is logged quoted and truncated, and can never
-  break a log line. Accepted and stale announcements MUST NOT be logged.
+- **FR-051**: The Daemon MUST log each **refused** announcement (invalid
+  identifier, invalid state, invalid name, Step cap reached) with the reason, the
+  identifier and the name, **as received**. Both are untrusted, so both are logged
+  quoted and truncated to 128 bytes, and can never break a log line. Accepted and
+  stale announcements MUST NOT be logged.
+- **FR-052**: Steps MUST NOT affect a Grant, a Release or the Queue. They are a
+  label on the Job and nothing else.
 
 ### Key Entities
 
@@ -196,7 +229,8 @@ same as without the announcements.
   lifecycle is announced → running → ended (or gone with its Job). It is not a
   Job: in a repository's CI script these are often called "jobs", and in trainsty
   they are Steps.
-- **Job** (existing): gains its set of running Steps. Nothing else changes.
+- **Job** (existing): gains its set of running Steps. Nothing else changes, and
+  Steps never influence how the Job is granted or released (FR-052).
 
 ## Success Criteria *(mandatory)*
 
@@ -204,15 +238,21 @@ same as without the announcements.
 
 - **SC-010**: While a Runner reports Steps, a Developer can tell from the Dashboard
   alone which stage the Job is in. The displayed Step matches the running stage
-  within one refresh (about 2 seconds) of each start and end.
+  within 3 seconds of each start and end: one 2-second poll plus 1 second of
+  margin.
 - **SC-011**: On a run whose stages run in parallel, every stage running at that
   moment is on display. None is hidden by another.
 - **SC-012**: Adding Step announcements to a repository's CI script changes no
   run's result. The exit status is identical with and without them, including with
   no scheduler, an older scheduler, or outside a Runner.
 - **SC-013**: No Step announced by one run is ever shown on another run's row.
-- **SC-014**: Announcing a Step adds no noticeable time to a run: under 1 second
-  in the worst case (no scheduler answering), and imperceptible normally.
+  That holds in each named case: a stale identifier after Release, a Waiter's
+  identifier, a suite announcing to a Daemon started after a Shutdown, and an
+  announcement during a Lock hand-over.
+- **SC-014**: **Each** announcement adds at most 1 second when no scheduler
+  answers, and at most 100 milliseconds against a responsive local one. A run's
+  added time is therefore bounded by its number of announcements. An absent
+  scheduler normally refuses the connection at once rather than hanging.
 
 ## Assumptions
 
@@ -228,9 +268,21 @@ same as without the announcements.
   without changing this spec's requirements.
 - **The Dashboard's lag is unchanged.** It polls every 2 seconds (ADR-005), and a
   Step's display inherits that lag.
-- **The requirements note in the vault does not mention Steps.** It should gain
-  the requirement before implementation, so the mirror and the register can cite
-  it.
+- **Precondition for implementation: the vault note gains the requirement first.**
+  The requirements note does not mention Steps today. It must be updated and the
+  mirror re-copied before the register rows for FR-040–FR-052 are written.
+- **Accepted limitation: PID reuse.** If the previous Job's leader dies and the
+  operating system gives its pid to the next Runner, the previous run's leftover
+  processes could label the successor's row. This takes pid reuse inside one Lock
+  hand-over, and the cost is a wrong label, never a wrong Grant (research.md R3).
+- **Step joins the glossary before any code** uses it, with the ci-local "job"
+  clash recorded.
+- **Compatibility across versions:**
+
+  | Daemon \ script | Without announcements | With announcements |
+  | --- | --- | --- |
+  | Older (no Steps) | unchanged | each announcement prints one "not recorded" line; results unchanged |
+  | This feature | unchanged; no Steps shown | Steps shown |
 - **This is a MINOR constitution amendment.** It adds one endpoint, changes none,
   and the "no token" reasoning in SDR-001 still holds: a label is the only thing
   the new request can change.
