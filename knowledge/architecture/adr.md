@@ -2,7 +2,7 @@
 okf_version: "0.1"
 type: decision-record
 title: "Architecture Decision Records"
-description: "Log of architectural decisions for trainsty, newest first. Records the stack — Go, one static binary, stdlib only, the dashboard embedded with go:embed — and the scheduling architecture: the daemon is a traffic light the Runner obeys (003), termination targets the process group (002), the queue wait is Server-Sent Events (004), the dashboard polls and nothing is pushed to it (005), the lock is FIFO with exactly one holder (006), a reconnect keeps its queue position (007), the open registration is the primary liveness signal and the PID probe only its backstop (008), a shutdown releases the job without killing it (009), the command is named trainsty rather than the note's e2e-scheduler (010), the port bind is the single-instance mechanism (011), trainsty wrap ships the Runner as a client (012), and the binary ships as a release archive with go install alongside (013). OD-3 is the one decision still open."
+description: "Log of architectural decisions for trainsty, newest first. Records the stack — Go, one static binary, stdlib only, the dashboard embedded with go:embed — and the scheduling architecture: the daemon is a traffic light the Runner obeys (003), termination targets the process group (002), the queue wait is Server-Sent Events (004), the dashboard polls and nothing is pushed to it (005), the lock is FIFO with exactly one holder (006), a reconnect keeps its queue position (007), the open registration is the primary liveness signal and the PID probe only its backstop (008), a shutdown releases the job without killing it (009), the command is named trainsty rather than the note's e2e-scheduler (010), the port bind is the single-instance mechanism (011), trainsty wrap ships the Runner as a client (012), and the binary ships as a release archive with go install alongside (013). ADR-014, proposed, would have wrap start the daemon when none is reachable. OD-3 is the one decision still open."
 tags: [architecture, adr, decisions, go, scheduler]
 timestamp: "2026-09-14"
 ---
@@ -67,6 +67,47 @@ round forced all three:
   alongside it: **ADR-013** below, now accepted.
 
 ## Decisions
+
+## ADR-014 — `trainsty wrap` starts the Daemon when none is reachable
+
+- **Status:** proposed — spec in `specs/003-wrap-starts-daemon/spec.md`,
+  implementation deferred
+- **Date:** 2026-11-07
+- **Context:** ADR-012 made an unreachable Daemon a warning: `wrap` runs the suite
+  unserialized and says so once (FR-038). In practice the Daemon is absent because
+  nobody ran `trainsty start` after login, or it was stopped — so suites collide in
+  exactly the situation the product exists for, behind a line of stderr nobody
+  reads. `playbooks/wrapper-integration.md` §6 rejected "start the daemon" as a
+  default for two reasons: it surprises people, and two Runners racing to start
+  one is a new failure mode.
+- **Decision:** When no Daemon is reachable, `wrap` starts one with `trainsty
+  start`'s existing detached start, says so once with the log path, then
+  registers. If the start fails or does not come up within a bound, `wrap` falls
+  back to FR-038: run anyway, say once why.
+- **Consequences:**
+  - **§6's race objection does not hold**: the port bind is already the
+    single-instance lock (ADR-011). A loser's Daemon fails to bind and exits; the
+    losing `wrap` registers with the winner. No new mechanism, no PID file.
+  - **§6's surprise objection is answered by the start message**: the Daemon
+    appears once, says where it logs, and is an ordinary Daemon afterwards. This
+    reverses §6 for `wrap`; a hand-written Runner still chooses for itself.
+  - **`trainsty stop` lasts only until the next wrapped run**, and must say so.
+  - **Principle II holds**: the spawn is in the client (ADR-012), inside the
+    `os/exec` boundary the local CI gate enforces. The Daemon is unchanged.
+  - **No API, flag or configuration change.** The opt-out is a hand-written
+    Runner.
+  - **Tests of the fallback must not start a real Daemon** on the machine's port.
+  - A Runner in a container that cannot reach the host's Daemon starts a private
+    one inside the container; the start message makes that visible.
+- **Alternatives considered:**
+  - **A login launch agent / `systemd --user` unit** — rejected as the product's
+    answer for the reason `specs/001-serialize-e2e-runs/research.md` R3 gives: a
+    second artifact to install. It remains a developer's own choice.
+  - **One line in each repository's script** that starts the Daemon if
+    `trainsty status` fails — works today, and is the interim recommendation in
+    `playbooks/wrapper-integration.md`, but every repository has to remember it.
+  - **Fail instead of run-anyway** — rejected: a tool that blocks work when its
+    convenience is unavailable gets deleted from the script (ADR-012).
 
 ## ADR-013 — A released archive is the distribution channel, with `go install` beside it
 
