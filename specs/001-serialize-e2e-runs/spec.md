@@ -4,7 +4,7 @@
 
 **Created**: 2026-09-13
 
-**Status**: Draft
+**Status**: Implemented — released as `v1.0.0`
 
 **Input**: User description: "Serialize local end-to-end test runs on one developer machine behind a single exclusive lock held by a background daemon, so that multiple repository clones cannot run E2E suites concurrently. Three prioritized, independently shippable user stories: (P1) the lock itself; (P2) a read-only web dashboard; (P3) manual job termination."
 

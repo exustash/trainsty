@@ -17,7 +17,7 @@ history.
 > `knowledge/security/sdr.md` → SDR-001, and the glossary. The design sketch this
 > spec was written from is [`plan.md`](plan.md) in this directory.
 >
-> **Numbering continues from feature 001** (FR-040 onward, SC-010 onward), because
+> **Numbering continues from feature 001** (FR-040 onward, SC-011 onward), because
 > the code cites requirement numbers bare (`FR-037`), and a second FR-001 would
 > make every citation ambiguous.
 
@@ -27,7 +27,7 @@ history.
 
 - Q: Several Steps can run at once; what does the Job's row show? → A: Every
   running Step, one line each with its own elapsed time, oldest first, capped at
-  16 (User Story 2, FR-044–FR-046, SC-011).
+  16 (User Story 2, FR-044–FR-046, SC-012).
 - Q: What exit status does the Step command return when the announcement is not
   recorded? → A: Always 0, with one line on stderr when it was not recorded
   (FR-049).
@@ -236,20 +236,20 @@ same as without the announcements.
 
 ### Measurable Outcomes
 
-- **SC-010**: While a Runner reports Steps, a Developer can tell from the Dashboard
+- **SC-011**: While a Runner reports Steps, a Developer can tell from the Dashboard
   alone which stage the Job is in. The displayed Step matches the running stage
   within 3 seconds of each start and end: one 2-second poll plus 1 second of
   margin.
-- **SC-011**: On a run whose stages run in parallel, every stage running at that
+- **SC-012**: On a run whose stages run in parallel, every stage running at that
   moment is on display. None is hidden by another.
-- **SC-012**: Adding Step announcements to a repository's CI script changes no
+- **SC-013**: Adding Step announcements to a repository's CI script changes no
   run's result. The exit status is identical with and without them, including with
   no scheduler, an older scheduler, or outside a Runner.
-- **SC-013**: No Step announced by one run is ever shown on another run's row.
+- **SC-014**: No Step announced by one run is ever shown on another run's row.
   That holds in each named case: a stale identifier after Release, a Waiter's
   identifier, a suite announcing to a Daemon started after a Shutdown, and an
   announcement during a Lock hand-over.
-- **SC-014**: **Each** announcement adds at most 1 second when no scheduler
+- **SC-015**: **Each** announcement adds at most 1 second when no scheduler
   answers, and at most 100 milliseconds against a responsive local one. A run's
   added time is therefore bounded by its number of announcements. An absent
   scheduler normally refuses the connection at once rather than hanging.

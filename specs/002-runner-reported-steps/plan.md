@@ -31,7 +31,7 @@ reads it and always exits 0, so a progress label can never fail CI.
 
 **Project Type**: single static binary: Daemon, CLI and embedded Dashboard
 
-**Performance Goals**: each announcement adds at most 1 s with no Daemon answering, and at most 100 ms against a responsive one (SC-014)
+**Performance Goals**: each announcement adds at most 1 s with no Daemon answering, and at most 100 ms against a responsive one (SC-015)
 
 **Constraints**: no new dependency, mutex, persistence, configuration or push channel; the Daemon never reads the Runner's output (FR-050)
 

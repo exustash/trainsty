@@ -15,8 +15,8 @@ today's run-anyway behaviour. No API change, no flag."
 **Amends**: `specs/001-serialize-e2e-runs/spec.md` → **FR-038**.
 
 > Requirements continue the repository's sequence: 001 ends at FR-039 and
-> SC-010; 002 (Runner-reported Steps, on its own branch) holds FR-040–FR-051
-> and SC-010–SC-014. This feature starts at FR-052 and SC-015.
+> SC-010; 002 (Runner-reported Steps) holds FR-040–FR-051 and
+> SC-011–SC-015. This feature starts at FR-052 and SC-016.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -169,16 +169,16 @@ say-once obligations stand.
 
 ### Measurable Outcomes
 
-- **SC-015**: With no Daemon running, 100% of wrapped runs are serialized
+- **SC-016**: With no Daemon running, 100% of wrapped runs are serialized
   unless the port is held by another program or the start fails.
-- **SC-016**: With no Daemon running, 10 wrapped suites launched within one
+- **SC-017**: With no Daemon running, 10 wrapped suites launched within one
   second never overlap, and exactly one Daemon is running afterwards, in 20 of
   20 repetitions.
-- **SC-017**: When the Daemon cannot be started, the suite begins within 3
+- **SC-018**: When the Daemon cannot be started, the suite begins within 3
   seconds of `wrap` being invoked.
-- **SC-018**: When a Daemon is already running, a wrapped run's behaviour and
+- **SC-019**: When a Daemon is already running, a wrapped run's behaviour and
   output are identical to today's.
-- **SC-019**: A Developer who never runs `trainsty start` sees no "NOT
+- **SC-020**: A Developer who never runs `trainsty start` sees no "NOT
   serialized" message in ordinary use.
 
 ## Assumptions
