@@ -339,6 +339,10 @@ surface. The procedure, including the `setsid` requirement and a six-step
 verification, is
 [`knowledge/playbooks/wrapper-integration.md`](knowledge/playbooks/wrapper-integration.md).
 
+**Running in containers with Podman:** Trainsty can run inside Podman Pods (sharing
+network and PID namespaces) or wrap containerized suites from a host daemon. The
+procedure is [`knowledge/playbooks/podman.md`](knowledge/playbooks/podman.md).
+
 ---
 
 ## Development
