@@ -111,7 +111,7 @@ the new command.
 | `knowledge/domains/ubiquitous-language.md` | **First:** the Step term. Banned names: stage, phase, task, job |
 | `.specify/memory/constitution.md` | MINOR 1.1.0: `POST /step` in the API surface; version line; Sync Impact Report |
 | `knowledge/conventions/api.md` | Endpoint table and a `/step` section |
-| `knowledge/architecture/adr.md` | ADR-014: the Runner announces Steps (R1's rejected alternatives) |
+| `knowledge/architecture/adr.md` | ADR-015: the Runner announces Steps (R1's rejected alternatives; ADR-014 is wrap starting the Daemon) |
 | `knowledge/data/state.md`, `knowledge/data/ddr.md` | Steps held in memory; DDR-003 records that nothing new is written |
 | `knowledge/security/sdr.md` | SDR-001 note: `/step` changes only a label, so the no-token reasoning holds |
 | `knowledge/product/decisions.md` | Register rows for FR-040–FR-052, **after** the vault note gains the requirement |
