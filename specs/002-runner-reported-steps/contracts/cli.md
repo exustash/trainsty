@@ -37,5 +37,6 @@ script branches on, and a `set -e` script must survive it.
 
 Once the Lock is **granted**, the suite's environment gains
 `TRAINSTY_PID=<wrap's own pid>`, the pid it registered with. It is not set when the
-run is unserialized (no daemon, refused, lost stream). Nothing else about `wrap`
+run is unserialized (no daemon, refused, lost stream), and `wrap` never removes one
+it inherited: a nested, unserialized run keeps the outer Job's value. Nothing else about `wrap`
 changes: streams, signals and exit status are as in 001.
