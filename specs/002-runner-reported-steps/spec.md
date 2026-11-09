@@ -38,6 +38,19 @@ history.
   1-second bound is per announcement; restarts are allowed at the cap; Steps
   survive a re-registration; `TRAINSTY_PID` is contract; FR-052 was added.
 
+### Session 2026-11-08
+
+- Q: Does an unserialized `wrap` clear a `TRAINSTY_PID` it inherited? → A: No.
+  `wrap` only sets it on its own Grant and never removes one (FR-048).
+- Q: Does SC-011's 3-second bound cover a Step removed by a Release? → A: No. It
+  covers announced starts and ends; a Step removed by a Release disappears with
+  its Job, inheriting the Job row's lag (up to ~7 s, ADR-005).
+- Q: Which success criterion checks FR-052? → A: SC-013, extended: Grants and
+  Releases happen in the same order and at the same moments with and without
+  announcements.
+- Q: Two parallel stages announce the same name; what is shown? → A: One line;
+  the first end removes it. Distinct stages need distinct names (Edge Cases).
+
 ## User Scenarios & Testing *(mandatory)*
 
 Actors: the **Developer**, watching the Dashboard; and the **Runner**, the local CI
@@ -147,6 +160,10 @@ same as without the announcements.
   text and never interpreted.
 - **Names that differ only in whitespace.** Names are compared byte for byte, with
   no trimming, so `Lint` and `Lint ` are two different Steps.
+- **Two parallel stages with the same name.** The name is the Step's identity, so
+  they share one line, and the first end removes it while the other may still
+  run. Starts and ends are not counted. A Runner that wants both shown gives them
+  distinct names.
 - **The same Runner re-registers** (ADR-007: a re-registration by the Job's own pid
   is granted at once). The Job is unchanged, so its running Steps are kept.
 - **A suite still running after a Shutdown** (ADR-009) announces Steps to a later
@@ -201,7 +218,9 @@ same as without the announcements.
 - **FR-048**: The shipped Runner MUST make its registered process identifier
   available to the command it runs, as the environment variable `TRAINSTY_PID`, and
   only once the Lock is granted, so a script can announce Steps with no
-  configuration. The variable's name and meaning are part of the compatibility
+  configuration. It MUST NOT remove a `TRAINSTY_PID` it inherited: an inner run
+  that is not serialized leaves the outer Job's value, so its Steps label the Job
+  actually running them. The variable's name and meaning are part of the compatibility
   surface: changing either is a breaking change.
 - **FR-049**: The product MUST provide a command a script can call to announce a
   Step. It MUST always exit with status 0, so a script that aborts on the first
@@ -238,13 +257,17 @@ same as without the announcements.
 
 - **SC-011**: While a Runner reports Steps, a Developer can tell from the Dashboard
   alone which stage the Job is in. The displayed Step matches the running stage
-  within 3 seconds of each start and end: one 2-second poll plus 1 second of
-  margin.
+  within 3 seconds of each **announced** start and end: one 2-second poll plus 1
+  second of margin. A Step removed by a Release leaves with its Job, as fast as
+  the Job's row does (up to about 7 seconds after a Liveness Probe release,
+  ADR-005).
 - **SC-012**: On a run whose stages run in parallel, every stage running at that
   moment is on display. None is hidden by another.
 - **SC-013**: Adding Step announcements to a repository's CI script changes no
   run's result. The exit status is identical with and without them, including with
-  no scheduler, an older scheduler, or outside a Runner.
+  no scheduler, an older scheduler, or outside a Runner. Scheduling is unchanged
+  too (FR-052): the same Runners queued the same way are granted in the same order,
+  and released at the same moments, with and without announcements.
 - **SC-014**: No Step announced by one run is ever shown on another run's row.
   That holds in each named case: a stale identifier after Release, a Waiter's
   identifier, a suite announcing to a Daemon started after a Shutdown, and an
