@@ -1,5 +1,13 @@
 <!--
 Sync Impact Report
+Version change: 1.0.0 -> 1.1.0 (2026-11-10)
+Bump rationale: MINOR. `GET /history` added to the API surface — the Job History
+the Dashboard's History view reads. Read-only, additive; no existing client
+changes. The history is in memory and bounded (DDR-003), so Principle V holds.
+Migration: none. Specs/002's planned `POST /step` amendment becomes 1.1.0 -> 1.2.0.
+
+---
+Previous report (1.0.0):
 Version change: (unfilled template) -> 1.0.0
 Bump rationale: Initial ratification. All placeholder tokens replaced with concrete,
 testable governance derived from the Trainsty local E2E scheduler requirements note.
@@ -109,9 +117,9 @@ glance, which is what lets a developer trust a lock they cannot see.
 - **Port**: the daemon binds the hardcoded port `45678` and MUST NOT fall back to another
   port. A bind failure MUST exit with a message naming the port and the likely cause
   (a daemon already running).
-- **API surface**: `GET /register` (SSE), `POST /release`, `GET /status`, `POST /stop`, and
-  `POST /shutdown` are the complete contract. Adding an endpoint is a MINOR amendment;
-  changing or removing one is MAJOR.
+- **API surface**: `GET /register` (SSE), `POST /release`, `GET /status`, `GET /history`,
+  `POST /stop`, and `POST /shutdown` are the complete contract. Adding an endpoint is a
+  MINOR amendment; changing or removing one is MAJOR.
 - **Wait protocol**: queue waiting MUST use Server-Sent Events, never polling or a
   long-lived plain HTTP request, so a 20+ minute wait cannot be severed by a timeout.
 - **Timings**: the dashboard polls `/status` every 2000 ms; the daemon probes the active
@@ -169,4 +177,4 @@ assumed; "we might need it later" is not a justification. When no separate runti
 file exists, this constitution is the authoritative guidance for agents and contributors
 working in this repository.
 
-**Version**: 1.0.0 | **Ratified**: 2026-09-13 | **Last Amended**: 2026-09-13
+**Version**: 1.1.0 | **Ratified**: 2026-09-13 | **Last Amended**: 2026-11-10

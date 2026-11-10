@@ -43,6 +43,14 @@ value derives from the latest `/status` response.**
   clear the last known state without saying it is stale, and it does not render an
   empty Queue — *no daemon* and *no jobs* are different facts and look different.
 
+## The History view
+
+A second view of the same file, at `#history`, linked from the page's nav. It
+polls `GET /history` instead of `/status` while visible, and renders each
+finished Job's repo, start, end and duration — with `textContent`, like every
+other value. It is **since the Daemon started**, and says so (DDR-003); the
+complete record is the log's `job:` lines.
+
 ## The lag is real and is shown
 
 The page can be up to **one poll interval plus one probe interval** behind — about

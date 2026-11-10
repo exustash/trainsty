@@ -93,3 +93,18 @@ func TestPageRendersAnAdvancingElapsedTime(t *testing.T) {
 		t.Error("the page must poll, so the elapsed time advances")
 	}
 }
+
+// The Job History is a view of the same page, reached from the Dashboard, and
+// like everything else it derives from the Daemon rather than the browser.
+func TestPageOffersAJobHistoryViewFedByTheDaemon(t *testing.T) {
+	src := string(Page())
+	for _, want := range []string{`href="#history"`, `fetchJSON("/history")`, "durationSeconds",
+		"No job has finished since the scheduler started"} {
+		if !strings.Contains(src, want) {
+			t.Errorf("the page is missing %q", want)
+		}
+	}
+	if strings.Contains(src, "localStorage") {
+		t.Error("the history must come from /history, never from browser storage")
+	}
+}

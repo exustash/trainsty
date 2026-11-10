@@ -85,7 +85,7 @@ cmp "$HOME/Obsidian/Notes/Inbox/local-ci scheduler.md" \
 
 | # | Statement | Restated in |
 | - | --------- | ----------- |
-| FR-6 | Five endpoints: `GET /register` (SSE, `pid` + `repo`), `POST /release`, `GET /status`, `POST /stop`, `POST /shutdown` | `constitution.md` → Additional Constraints, `conventions/api.md` → The contract |
+| FR-6 | Five endpoints: `GET /register` (SSE, `pid` + `repo`), `POST /release`, `GET /status`, `POST /stop`, `POST /shutdown`. **The repository ships six** — see *Where the repository and the note disagree* | `constitution.md` → Additional Constraints, `conventions/api.md` → The contract, `architecture/structure.md`, `architecture/overview.md`, `index.md`, `CLAUDE.md` → Architecture Stability, `httpapi/guard.go` |
 
 ## CLI — note §5
 
@@ -113,13 +113,14 @@ table exists so the note's silences are visible from the product side too.
 
 ## Where the repository and the note disagree
 
-One row, and it is a naming change rather than a requirement change.
+Naming changes and additions, never a requirement removed.
 
 | What | Note says | Repository says | Resolution |
 | ---- | --------- | --------------- | ---------- |
 | The command name | `e2e-scheduler`, in all five §5 bullets | `trainsty` | **The vault moves.** `architecture/adr.md` → ADR-010: the project was named after the note was written. Until the vault is edited, the mirror and the code disagree by design, with ADR-010 as the reason. |
 | The Runner's name | "local CI wrapper script" | **Runner** | **The vault moves.** `domains/ubiquitous-language.md` → *Words this project does not use*. A glossary term cannot be a four-word phrase that also names a shell idiom. |
 | The number of subcommands | Five: `start`, `stop`, `status`, `ui`, `help` (FR-7) | **Six** — `wrap` is added | **The vault moves.** `architecture/adr.md` → ADR-012 ships the Runner as a subcommand, which the note did not anticipate because it assumed each repository would write its own. FR-7's statement above is left as the note's, not corrected in place. |
+| The number of endpoints | Five (FR-6) | **Six** — `GET /history` is added | **The vault moves.** Constitution 1.1.0 adds the read-only Job History endpoint for the Dashboard's History view (DDR-003). FR-6's statement above is left as the note's. |
 
 **Both are vault edits, not repository edits.** Editing the mirror to agree would
 break the byte-identical property that makes a re-copy safe.

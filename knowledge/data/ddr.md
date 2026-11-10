@@ -47,6 +47,27 @@ exists to prevent in other people's tooling.
 
 ## Decisions
 
+## DDR-003 — The Job History lives in memory, bounded, and dies with the Daemon
+
+- **Status:** accepted
+- **Date:** 2026-11-10
+- **Context:** The Dashboard's History view shows which repo held the Lock, from
+  when to when, and for how long. The durable record already exists — DDR-002's
+  `job:` lines — but DDR-002 forbids reading the log back.
+- **Decision:** `Scheduler` keeps the last `HistoryLimit` (50) released Jobs in
+  memory, under the one mutex, recorded by `Release` itself so all five release
+  paths feed it. Served by `GET /history`.
+- **At rest:** nothing. **Nothing new is written outside memory.**
+- **Lifetime:** the Daemon's; a restart empties it. The page says so and points
+  at the log for the full record.
+- **Consequences:**
+  - **DDR-001 and DDR-002 both hold.** Nothing is read at startup, and the
+    history cannot become a stale lock: nothing schedules from it.
+  - **Bounded by a constant, not by uptime.** An unbounded slice on a daemon is
+    a slow leak; 50 entries is a few kilobytes.
+  - **History across restarts would mean reading the log**, i.e. superseding
+    DDR-002 — rejected on 2026-11-10 in favour of this.
+
 ## DDR-002 — The Daemon appends to a per-user log file it never reads
 
 - **Status:** accepted

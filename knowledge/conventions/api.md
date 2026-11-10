@@ -2,7 +2,7 @@
 okf_version: "0.1"
 type: convention
 title: "API Conventions"
-description: "The five-endpoint local API as a compatibility and trust boundary: the exact contract of /register, /release, /status, /stop and /shutdown, the SSE mechanics that a default http.Server breaks, the timeouts that must be zero, and the validation every endpoint owes. Read before changing any handler."
+description: "The six-endpoint local API as a compatibility and trust boundary: the exact contract of /register, /release, /status, /history, /stop and /shutdown, the SSE mechanics that a default http.Server breaks, the timeouts that must be zero, and the validation every endpoint owes. Read before changing any handler."
 tags: [conventions, api, http, sse, contract]
 timestamp: "2026-09-13"
 ---
@@ -27,6 +27,7 @@ Served on `127.0.0.1:45678` — **loopback, never `0.0.0.0`**
 | `/register` | `GET` | SSE | Holds the stream open until the Grant. Requires `pid` and `repo` query parameters. |
 | `/release` | `POST` | JSON | Called from the Runner's `trap`. Signals completion and advances the Queue. |
 | `/status` | `GET` | JSON | Polled by the Dashboard every 2000 ms. The Job and the ordered Queue. |
+| `/history` | `GET` | JSON | The Dashboard's History view. `{"jobs":[…]}` — the last `HistoryLimit` (50) released Jobs, newest first: `pid`, `repo`, `grantedAt`, `releasedAt`, `durationSeconds`. Memory only; empty after a restart (DDR-003). |
 | `/stop` | `POST` | JSON | The Dashboard's Stop control. Terminates the Job's Process Group. |
 | `/shutdown` | `POST` | JSON | `trainsty stop`. Releases the Lock and exits — **it does not kill the Job** (ADR-009). |
 
@@ -130,7 +131,7 @@ which it must be revisited.
 
 ## Changing the surface
 
-1. The constitution's Additional Constraints name the five endpoints. Adding one
+1. The constitution's Additional Constraints name the six endpoints. Adding one
    is a MINOR amendment to `.specify/memory/constitution.md`, in the same change.
 2. Update this file, and the table in
    [`../product/local-ci-scheduler-requirements.md`](../product/local-ci-scheduler-requirements.md)'s

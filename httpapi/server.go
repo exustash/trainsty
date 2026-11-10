@@ -64,6 +64,7 @@ func New(sched *scheduler.Scheduler, logger *log.Logger) *Server {
 	// "something else holds the port" cannot be told apart.
 	s.mux.HandleFunc("/status", guardReadOnly(s.handleStatus))
 	s.mux.HandleFunc("/register", guardReadOnly(s.handleRegister))
+	s.mux.HandleFunc("/history", guardReadOnly(s.handleHistory))
 	s.mux.HandleFunc("/release", guardMutating(s.handleRelease))
 	s.mux.HandleFunc("/stop", guardMutating(s.handleStop))
 	s.mux.HandleFunc("/shutdown", guardMutating(s.handleShutdown))

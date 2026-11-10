@@ -445,3 +445,88 @@ func TestConcurrentRegisterAndReleaseNeverGrantsTwice(t *testing.T) {
 		t.Fatalf("want a drained queue, got %d waiters", len(snap.Queue))
 	}
 }
+
+func TestHistoryRecordsEachReleasedJobNewestFirst(t *testing.T) {
+	s := New()
+	base := time.Date(2026, 11, 10, 9, 0, 0, 0, time.UTC)
+	now := base
+	s.SetClock(func() time.Time { return now })
+	s.Register(100, "first")
+	s.Register(200, "second")
+
+	now = base.Add(90 * time.Second)
+	s.Release(s.Current())
+	now = base.Add(5 * time.Minute)
+	s.Release(s.Current())
+	history := s.History()
+
+	if len(history) != 2 || history[0].Repo != "second" || history[1].Repo != "first" {
+		t.Fatalf("want [second first], got %+v", history)
+	}
+	first := history[1]
+	if !first.GrantedAt.Equal(base) || !first.ReleasedAt.Equal(base.Add(90*time.Second)) ||
+		first.DurationSeconds != 90 || first.PID != 100 {
+		t.Fatalf("want first held 0s→90s for 90s by pid 100, got %+v", first)
+	}
+	if history[0].DurationSeconds != 210 {
+		t.Fatalf("want second held for 210s, got %+v", history[0])
+	}
+}
+
+func TestHistoryIsEmptyNotNilOnAFreshScheduler(t *testing.T) {
+	s := New()
+
+	history := s.History()
+
+	if history == nil || len(history) != 0 {
+		t.Fatalf("want an empty, non-nil history, got %#v", history)
+	}
+}
+
+func TestHistoryRecordsARacedReleaseOnce(t *testing.T) {
+	s := New()
+	waiter := s.Register(100, "a")
+	job := s.Current()
+
+	s.Release(job)
+	s.Withdraw(waiter)
+	s.Release(job)
+
+	if got := len(s.History()); got != 1 {
+		t.Fatalf("want one entry for one Job, got %d", got)
+	}
+}
+
+// Memory only (DDR-003): it must not grow with the Daemon's uptime.
+func TestHistoryKeepsOnlyTheMostRecentJobs(t *testing.T) {
+	s := New()
+
+	for pid := 1; pid <= HistoryLimit+5; pid++ {
+		s.Register(pid, "r")
+		s.Release(s.Current())
+	}
+	history := s.History()
+
+	if len(history) != HistoryLimit {
+		t.Fatalf("want %d entries, got %d", HistoryLimit, len(history))
+	}
+	if history[0].PID != HistoryLimit+5 || history[HistoryLimit-1].PID != 6 {
+		t.Fatalf("want newest pid %d first and oldest kept pid 6 last, got %d … %d",
+			HistoryLimit+5, history[0].PID, history[HistoryLimit-1].PID)
+	}
+}
+
+// The returned slice is a copy: a caller marshalling it must not race the next
+// Release.
+func TestHistoryReturnsACopy(t *testing.T) {
+	s := New()
+	s.Register(100, "a")
+	s.Release(s.Current())
+
+	history := s.History()
+	history[0].Repo = "mutated"
+
+	if s.History()[0].Repo != "a" {
+		t.Fatal("History must return a copy, not the Scheduler's own slice")
+	}
+}

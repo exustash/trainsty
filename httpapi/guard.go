@@ -1,4 +1,4 @@
-// Package httpapi serves the five-endpoint local API and the dashboard.
+// Package httpapi serves the six-endpoint local API and the dashboard.
 //
 // The API is a compatibility surface: its clients include hand-written Runner
 // scripts in repositories this project cannot see and cannot upgrade
