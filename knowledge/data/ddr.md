@@ -64,6 +64,10 @@ exists to prevent in other people's tooling.
 - **At rest:** plaintext, in the user's own directory, mode `0600`. It holds grants,
   releases, refusals and their causes; it holds nothing about what any suite was
   testing (`CLAUDE.md` → Logging).
+  **Every Release also appends one Job history line** — `job: repo=… pid=…
+  grantedAt=… releasedAt=… duration=…` — so `grep ' job: '` on the file is the
+  history of who held the Lock and for how long. Still append-only, still never
+  read back.
 - **Lifetime:** indefinite, and **unbounded — see the consequence below.** Removed by
   the user deleting it; nothing in trainsty removes it.
 - **Consequences:**

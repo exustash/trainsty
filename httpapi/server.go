@@ -72,6 +72,7 @@ func New(sched *scheduler.Scheduler, logger *log.Logger) *Server {
 	// The liveness probe is started by the scheduler on every Grant, so it is
 	// owned by the Job rather than by the server.
 	sched.SetOnGrant(s.startProbe)
+	sched.SetOnRelease(s.logJobHistory)
 
 	s.http = &http.Server{
 		Handler: s.mux,
@@ -151,6 +152,17 @@ func (s *Server) Serve(ln net.Listener) error {
 		_ = s.http.Close()
 		return nil
 	}
+}
+
+// logJobHistory appends one line per finished Job: the repo it came from, when
+// it took the Lock, when it gave it back, and for how long. It shares the
+// DDR-002 log and, like everything there, is never read back.
+func (s *Server) logJobHistory(job *scheduler.Job, releasedAt time.Time) {
+	s.logf("job: repo=%q pid=%d grantedAt=%s releasedAt=%s duration=%s",
+		job.Repo, job.PID,
+		job.GrantedAt.UTC().Format(time.RFC3339),
+		releasedAt.UTC().Format(time.RFC3339),
+		releasedAt.Sub(job.GrantedAt).Round(time.Second))
 }
 
 func (s *Server) logf(format string, args ...any) {

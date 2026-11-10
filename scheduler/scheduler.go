@@ -69,6 +69,9 @@ type Scheduler struct {
 	// onGrant runs just after a Job is installed, outside the mutex. httpapi uses
 	// it to start the liveness probe; scheduler itself knows nothing about probes.
 	onGrant func(*Job)
+	// onRelease runs just after a Job is released, outside the mutex, with the
+	// release time. httpapi uses it to append the Job's history line.
+	onRelease func(job *Job, releasedAt time.Time)
 }
 
 // New returns an empty Scheduler with the Lock free.
@@ -86,6 +89,13 @@ func (s *Scheduler) SetOnGrant(fn func(*Job)) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.onGrant = fn
+}
+
+// SetOnRelease registers a hook run once per released Job, outside the mutex.
+func (s *Scheduler) SetOnRelease(fn func(job *Job, releasedAt time.Time)) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.onRelease = fn
 }
 
 // Register enrolls pid and returns its Waiter. The caller waits on Granted().
@@ -189,11 +199,16 @@ func (s *Scheduler) Release(job *Job) bool {
 		job.stopProbe()
 	}
 	s.job = nil
+	releasedAt := s.now()
+	releaseHook := s.onRelease
 	granted := s.grantLocked()
 	hook := s.onGrant
 	next := s.job
 	s.mu.Unlock()
 
+	if releaseHook != nil {
+		releaseHook(job, releasedAt)
+	}
 	if granted != nil {
 		granted.signal()
 		if hook != nil {
