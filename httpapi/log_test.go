@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/exustash/trainsty/scheduler"
 )
@@ -130,4 +131,23 @@ func TestOpenLogFallsBackRatherThanFailing(t *testing.T) {
 		t.Errorf("the fallback must say where output goes instead; got %q", why)
 	}
 	logger.Print("must not panic")
+}
+
+// Every finished Job leaves one history line: the repo it came from, when it
+// took the Lock, when it gave it back, and how long it held it.
+func TestLogRecordsJobHistoryOnRelease(t *testing.T) {
+	_, sched, logged := recordingServer(t) // New wires the release hook
+	grantTime := time.Date(2026, 11, 10, 10, 4, 11, 0, time.UTC)
+	now := grantTime
+	sched.SetClock(func() time.Time { return now })
+	sched.Register(4123, "capture.web")
+	now = grantTime.Add(17*time.Minute + 29*time.Second)
+
+	sched.Release(sched.Current())
+
+	want := `job: repo="capture.web" pid=4123 grantedAt=2026-11-10T10:04:11Z ` +
+		`releasedAt=2026-11-10T10:21:40Z duration=17m29s`
+	if !strings.Contains(logged.String(), want) {
+		t.Fatalf("want the job history line\n%s\ngot:\n%s", want, logged.String())
+	}
 }

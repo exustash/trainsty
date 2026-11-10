@@ -288,6 +288,51 @@ func TestOnGrantHookFiresForEachGrant(t *testing.T) {
 	}
 }
 
+// The release hook is what the Job history line is written from, so it must
+// carry the Job that held the Lock and the moment the Lock left it.
+func TestOnReleaseHookReportsTheJobAndReleaseTime(t *testing.T) {
+	s := New()
+	grantTime := time.Date(2026, 11, 10, 10, 0, 0, 0, time.UTC)
+	now := grantTime
+	s.SetClock(func() time.Time { return now })
+	var releasedJob *Job
+	var releasedAt time.Time
+	s.SetOnRelease(func(job *Job, at time.Time) {
+		releasedJob, releasedAt = job, at
+	})
+	s.Register(100, "capture.web")
+	job := s.Current()
+	now = grantTime.Add(17 * time.Minute)
+
+	s.Release(job)
+
+	if releasedJob != job {
+		t.Fatalf("want the hook called with the released Job, got %+v", releasedJob)
+	}
+	if !releasedJob.GrantedAt.Equal(grantTime) || !releasedAt.Equal(now) {
+		t.Fatalf("want grantedAt=%v releasedAt=%v, got %v and %v",
+			grantTime, now, releasedJob.GrantedAt, releasedAt)
+	}
+}
+
+// Two release paths routinely race for one Job; the history must record it once.
+func TestOnReleaseHookFiresOnceWhenReleasesRace(t *testing.T) {
+	s := New()
+	var calls int
+	s.SetOnRelease(func(*Job, time.Time) { calls++ })
+	waiter := s.Register(100, "a")
+	job := s.Current()
+
+	s.Release(job)
+	s.Withdraw(waiter)
+	s.ReleaseByPID(100)
+	s.Release(job)
+
+	if calls != 1 {
+		t.Fatalf("want the release hook exactly once for one Job, got %d", calls)
+	}
+}
+
 func TestSnapshotReportsTheJobTheQueueAndElapsedTimes(t *testing.T) {
 	s := New()
 	base := time.Date(2026, 9, 14, 10, 0, 0, 0, time.UTC)
