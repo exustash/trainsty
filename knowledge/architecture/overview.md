@@ -41,7 +41,7 @@ rules; this is why they exist.
 
 | Boundary | What is on the other side | Enforced by |
 | -------- | ------------------------- | ----------- |
-| **The API** | Runner scripts in repositories this project has never seen, unversioned and unupgradable | Validation on every parameter; a fixed five-endpoint surface the constitution makes a MAJOR amendment to change. [`../conventions/api.md`](../conventions/api.md) |
+| **The API** | Runner scripts in repositories this project has never seen, unversioned and unupgradable | Validation on every parameter; a fixed six-endpoint surface the constitution makes an amendment to change. [`../conventions/api.md`](../conventions/api.md) |
 | **The syscall seam** | The operating system, and process groups trainsty did not create | Everything in `process/`, exposing intent (`KillGroup`) rather than mechanism. A non-leader PID is refused at the boundary — ADR-002 |
 | **The mutex** | Every concurrent handler | One mutex, one critical section per decision, never held across a send or a signal. [`../data/state.md`](../data/state.md) |
 

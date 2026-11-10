@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/exustash/trainsty/dashboard"
+	"github.com/exustash/trainsty/scheduler"
 )
 
 // handleStatus reports the whole state: the Job and the Queue in grant order.
@@ -18,6 +19,12 @@ import (
 // (specs/001-serialize-e2e-runs/contracts/http-api.md).
 func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, s.sched.Snapshot())
+}
+
+// handleHistory reports the Job History: the most recent finished Jobs, newest
+// first. Copied under the scheduler's mutex and marshalled after, as /status is.
+func (s *Server) handleHistory(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, scheduler.History{Jobs: s.sched.History()})
 }
 
 // handleRoot serves the dashboard at / and 404s everything else with an empty

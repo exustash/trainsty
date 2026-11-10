@@ -63,7 +63,7 @@ trainsty/
 │   ├── group.go                #   Alive (ESRCH vs EPERM), IsGroupLeader
 │   ├── kill.go                 #   KillGroup — the one real signal, refuses pid <= 1
 │   └── *_test.go               #   real children, always reaped
-├── httpapi/                    # the five endpoints
+├── httpapi/                    # the six endpoints
 │   ├── server.go               #   mux, loopback bind, timeouts, bind classification
 │   ├── guard.go                #   the SDR-001 floor; the only error-body writer
 │   ├── register.go             #   SSE: per-request deadline, two flushes

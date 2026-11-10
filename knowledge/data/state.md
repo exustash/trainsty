@@ -23,7 +23,8 @@ timestamp: "2026-09-13"
 Scheduler                      # one instance, one mutex, the only state there is
 ├── mu          sync.Mutex     # guards every field below, without exception
 ├── job         *Job           # nil when the Lock is free
-└── queue       []*Waiter      # FIFO, keyed by pid — never two entries per pid
+├── queue       []*Waiter      # FIFO, keyed by pid — never two entries per pid
+└── history     []FinishedJobView  # last HistoryLimit released Jobs, newest first
 ```
 
 | Field | Holds | Read by | Written by |
@@ -32,6 +33,7 @@ Scheduler                      # one instance, one mutex, the only state there i
 | `job.repo` | A display label, nothing more (`architecture/adr.md` → OD-3) | `/status` | Grant only |
 | `job.grantedAt` | When the Grant happened — the Dashboard's elapsed time | `/status` | Grant only |
 | `job.release` | The one-shot that ends this Job, whichever path calls it | all five release paths | Grant only |
+| `history` | The Job History: `pid`, `repo`, `grantedAt`, `releasedAt`, `durationSeconds` per released Job, **display only** — nothing schedules from it (DDR-003) | `/history` | Release only, in the same critical section |
 | `waiter.pid` | **The Queue's identity** (ADR-007) | `/status`, `/register` | `/register` |
 | `waiter.repo` | Display label | `/status` | `/register` |
 | `waiter.queuedAt` | Arrival time — the FIFO order, and the wait the Dashboard shows | `/status` | `/register` |

@@ -77,7 +77,7 @@ The stable half of the knowledge base. All four are auto-loaded.
   mutex, naming, doc comments. **Read the indentation section before formatting
   anything**: `gofmt` wins over the global four-space rule, and that is the only
   place the house style loses.
-- [API Conventions](conventions/api.md) — the five-endpoint contract as a
+- [API Conventions](conventions/api.md) — the six-endpoint contract as a
   compatibility boundary, because **the clients are Runner scripts in repositories
   this project has never seen**. Carries the two mistakes that pass a short test
   and fail a real wait: a non-zero `WriteTimeout`, and a missing `Flush()`.

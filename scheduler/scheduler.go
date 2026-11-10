@@ -58,11 +58,19 @@ func (w *Waiter) signal() {
 	}
 }
 
+// HistoryLimit bounds the Job History. The ceiling is deliberate: the history is
+// memory only and must not grow with the Daemon's uptime (DDR-003). The complete
+// record is the log file's `job:` lines (DDR-002).
+const HistoryLimit = 50
+
 // Scheduler is the whole of trainsty's mutable state.
 type Scheduler struct {
 	mu    sync.Mutex
 	job   *Job
 	queue []*Waiter
+	// history holds the most recently released Jobs, newest first, at most
+	// HistoryLimit of them. Display only: nothing schedules from it.
+	history []FinishedJobView
 
 	// now is injectable so tests can assert on elapsed times without sleeping.
 	now func() time.Time
@@ -200,6 +208,7 @@ func (s *Scheduler) Release(job *Job) bool {
 	}
 	s.job = nil
 	releasedAt := s.now()
+	s.recordHistoryLocked(job, releasedAt)
 	releaseHook := s.onRelease
 	granted := s.grantLocked()
 	hook := s.onGrant
@@ -216,6 +225,24 @@ func (s *Scheduler) Release(job *Job) bool {
 		}
 	}
 	return true
+}
+
+// recordHistoryLocked prepends job to the Job History and drops the oldest entry
+// past HistoryLimit. The O(n) copy is fine at a ceiling of 50. The caller must
+// hold s.mu.
+func (s *Scheduler) recordHistoryLocked(job *Job, releasedAt time.Time) {
+	entry := FinishedJobView{
+		PID:             job.PID,
+		Repo:            job.Repo,
+		GrantedAt:       job.GrantedAt,
+		ReleasedAt:      releasedAt,
+		DurationSeconds: int(releasedAt.Sub(job.GrantedAt).Seconds()),
+	}
+	kept := s.history
+	if len(kept) >= HistoryLimit {
+		kept = kept[:HistoryLimit-1]
+	}
+	s.history = append([]FinishedJobView{entry}, kept...)
 }
 
 // ReleaseByPID releases the Lock if the Job's PID matches, and reports whether
@@ -330,4 +357,28 @@ func (s *Scheduler) Snapshot() Snapshot {
 		})
 	}
 	return snap
+}
+
+// FinishedJobView is one entry of the Job History: a Job that held the Lock and
+// has since been released, by any of the five release paths.
+type FinishedJobView struct {
+	PID             int       `json:"pid"`
+	Repo            string    `json:"repo"`
+	GrantedAt       time.Time `json:"grantedAt"`
+	ReleasedAt      time.Time `json:"releasedAt"`
+	DurationSeconds int       `json:"durationSeconds"`
+}
+
+// History is the whole of /history. Jobs is newest first and never nil, so a
+// client never has to tell an absent list from an empty one.
+type History struct {
+	Jobs []FinishedJobView `json:"jobs"`
+}
+
+// History copies the Job History under the mutex, newest first. The copy is what
+// lets the caller marshal it while another Release appends.
+func (s *Scheduler) History() []FinishedJobView {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return append(make([]FinishedJobView, 0, len(s.history)), s.history...)
 }

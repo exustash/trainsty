@@ -181,7 +181,7 @@ introduce, unless explicitly requested:
   the port bind is already the single-instance mechanism (ADR-011).
 - **Configuration.** No config file, no `--port`, no concurrency setting. A
   concurrency above one is a MAJOR constitution amendment, not a flag.
-- **A router, a web framework, or an SSE library.** Five routes is
+- **A router, a web framework, or an SSE library.** Six routes is
   `http.ServeMux`; SSE is three headers, a `fmt.Fprintf` and a `Flush`.
 - **A frontend framework or build step.** The Dashboard is one embedded file.
 - **A push channel to the Dashboard.** It polls (ADR-005), and the lag is a stated

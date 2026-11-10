@@ -46,6 +46,11 @@
   }
   button:hover { filter: brightness(1.1); }
   button:focus-visible { outline: 2px solid var(--fg); outline-offset: 2px; }
+  nav { display: flex; gap: 16px; margin: 0 0 16px; font-size: 0.9rem; }
+  nav a { color: var(--muted); text-decoration: none; padding-bottom: 2px; }
+  nav a[aria-current="page"] { color: var(--fg); font-weight: 600; border-bottom: 2px solid var(--accent); }
+  nav a:focus-visible { outline: 2px solid var(--fg); outline-offset: 2px; }
+  .note { color: var(--muted); font-size: 0.8rem; margin: 10px 0 0; }
   footer { color: var(--muted); font-size: 0.78rem; text-align: center; }
 </style>
 </head>
@@ -64,14 +69,28 @@
     </div>
   </header>
 
-  <section aria-labelledby="running-h">
-    <h2 id="running-h">Holding the lock</h2>
-    <div id="running"></div>
-  </section>
+  <nav aria-label="Views">
+    <a href="#" id="nav-now">Now</a>
+    <a href="#history" id="nav-history">History</a>
+  </nav>
 
-  <section aria-labelledby="queue-h">
-    <h2 id="queue-h">Waiting</h2>
-    <div id="queue"></div>
+  <div id="now-view">
+    <section aria-labelledby="running-h">
+      <h2 id="running-h">Holding the lock</h2>
+      <div id="running"></div>
+    </section>
+
+    <section aria-labelledby="queue-h">
+      <h2 id="queue-h">Waiting</h2>
+      <div id="queue"></div>
+    </section>
+  </div>
+
+  <section id="history-view" aria-labelledby="history-h" hidden>
+    <h2 id="history-h">Recently finished</h2>
+    <div id="history"></div>
+    <p class="note">The last 50 jobs since the scheduler started. The complete record is
+      the <code>job:</code> lines in the log file <code>trainsty start</code> printed.</p>
   </section>
 
   <footer id="foot"></footer>
@@ -90,6 +109,11 @@
   var running = document.getElementById("running");
   var queue = document.getElementById("queue");
   var foot = document.getElementById("foot");
+  var historyList = document.getElementById("history");
+  var nowView = document.getElementById("now-view");
+  var historyView = document.getElementById("history-view");
+  var navNow = document.getElementById("nav-now");
+  var navHistory = document.getElementById("nav-history");
 
   function el(tag, text, cls) {
     var n = document.createElement(tag);
@@ -185,6 +209,30 @@
     queue.appendChild(table(["#", "Repository", "Process", "Waiting"], rows));
   }
 
+  function clockTime(iso) {
+    var d = new Date(iso);
+    return isNaN(d.getTime()) ? "—" : d.toLocaleString();
+  }
+
+  function mono(text) {
+    var n = el("span", text);
+    n.dataset.mono = "1";
+    return n;
+  }
+
+  function renderHistory(list) {
+    clear(historyList);
+    if (!list || list.length === 0) {
+      historyList.appendChild(el("p", "No job has finished since the scheduler started.", "empty"));
+      return;
+    }
+    var rows = list.map(function (j) {
+      return [el("span", j.repo, "repo"), mono("pid " + j.pid), mono(clockTime(j.grantedAt)),
+        mono(clockTime(j.releasedAt)), mono(humanSeconds(j.durationSeconds))];
+    });
+    historyList.appendChild(table(["Repository", "Process", "Started", "Ended", "Duration"], rows));
+  }
+
   function renderUnreachable() {
     // Distinct from "nothing is running", and it must be TEXT rather than only a
     // colour. Rendering an empty queue here would be the page lying.
@@ -193,17 +241,40 @@
     running.appendChild(el("p", "Cannot reach the scheduler on port 45678.", "alert"));
     running.appendChild(el("p", "Start it with: trainsty start", "empty"));
     queue.appendChild(el("p", "Unknown — the scheduler is not answering.", "empty"));
+    clear(historyList);
+    historyList.appendChild(el("p", "Cannot reach the scheduler on port 45678.", "alert"));
+  }
+
+  // Two views of one page, chosen by the URL hash so the History view can be
+  // bookmarked. Only the visible view is polled.
+  function showingHistory() { return window.location.hash === "#history"; }
+
+  function showView() {
+    var onHistory = showingHistory();
+    nowView.hidden = onHistory;
+    historyView.hidden = !onHistory;
+    var current = onHistory ? navHistory : navNow;
+    var other = onHistory ? navNow : navHistory;
+    current.setAttribute("aria-current", "page");
+    other.removeAttribute("aria-current");
+  }
+
+  function fetchJSON(path) {
+    return fetch(path, { cache: "no-store" }).then(function (r) {
+      if (!r.ok) { throw new Error(path + " " + r.status); }
+      return r.json();
+    });
   }
 
   function refresh() {
-    return fetch("/status", { cache: "no-store" })
-      .then(function (r) {
-        if (!r.ok) { throw new Error("status " + r.status); }
-        return r.json();
-      })
-      .then(function (snap) {
+    var load = showingHistory()
+      ? fetchJSON("/history").then(function (h) { renderHistory(h.jobs); })
+      : fetchJSON("/status").then(function (snap) {
         renderRunning(snap.job);
         renderQueue(snap.queue);
+      });
+    return load
+      .then(function () {
         foot.textContent = "Updated " + new Date().toLocaleTimeString() +
           " · refreshing every " + (POLL_MS / 1000) + "s";
       })
@@ -216,6 +287,8 @@
       });
   }
 
+  window.addEventListener("hashchange", function () { showView(); refresh(); });
+  showView();
   refresh();
   setInterval(refresh, POLL_MS);
 })();
